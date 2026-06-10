@@ -76,7 +76,7 @@ export function OnboardingWizard() {
   const [saving, setSaving] = useState(false);
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
 
-  // Pre-fill from workspace + browser timezone
+  // Pre-fill from workspace + browser timezone, and advance step if workspace already saved
   useEffect(() => {
     if (workspace) {
       setName(workspace.name);
@@ -84,6 +84,10 @@ export function OnboardingWizard() {
         ? workspace.timezone
         : Intl.DateTimeFormat().resolvedOptions().timeZone
       );
+      // If workspace name is already set, skip past step 0
+      if (workspace.name && step === 0) {
+        setStep(1);
+      }
     }
   }, [workspace]);
 
