@@ -30,7 +30,7 @@ export default function DashboardLayout() {
   const subscriptionStatus = useQuery(api.subscriptions.checkUserSubscriptionStatus, {});
 
   const needsOnboarding =
-    workspace !== undefined && !workspace?.onboardingCompletedAt;
+    workspace === undefined || !workspace?.onboardingCompletedAt;
 
   // Client-side subscription guard — Convex enforces auth at the data layer
   if (subscriptionStatus !== undefined && !subscriptionStatus?.hasActiveSubscription) {

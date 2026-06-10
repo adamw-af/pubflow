@@ -131,7 +131,11 @@ export function OnboardingWizard() {
     }
   }
 
-  if (workspace === undefined) return null; // loading
+  if (workspace === undefined) return (
+    <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+      <Loader2 className="size-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6">

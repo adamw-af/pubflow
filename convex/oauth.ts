@@ -174,7 +174,7 @@ export const oauthCallback = httpAction(async (ctx, request) => {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: `${frontendUrl}/dashboard/settings?connected=${platform}`,
+        Location: `${frontendUrl}/dashboard?connected=${platform}`,
       },
     });
   } catch (err) {
