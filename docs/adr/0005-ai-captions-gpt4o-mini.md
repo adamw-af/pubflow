@@ -1,0 +1,3 @@
+# AI caption assistance uses GPT-4o-mini with a per-Workspace rate limit
+
+AI-assisted caption generation uses GPT-4o-mini (not GPT-4o) for cost efficiency — it is 15x cheaper and sufficient for caption writing and platform adaptation. Usage is capped at 50 AI generations per Workspace per day, enforced in the Convex mutation layer. An OpenAI account-level spend cap is set as a secondary safeguard. The feature is only accessible to subscribed users. A standalone AI chat page (present in the starter template) is removed — AI is surfaced as a contextual inline button in the Post Variant editor only.

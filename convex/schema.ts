@@ -1,0 +1,219 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+  users: defineTable({
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+    image: v.optional(v.string()),
+    tokenIdentifier: v.string(),
+    workspaceId: v.optional(v.id("workspaces")),
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_workspace", ["workspaceId"]),
+
+  workspaces: defineTable({
+    name: v.string(),
+    ownerTokenIdentifier: v.string(),
+    tier: v.union(v.literal("base"), v.literal("pro"), v.literal("premium")),
+    // IANA timezone string e.g. "Europe/London", "America/New_York"
+    timezone: v.string(),
+    onboardingCompletedAt: v.optional(v.number()),
+    emailNotifications: v.optional(v.object({
+      publicationFailed: v.boolean(),
+    })),
+  }).index("by_owner", ["ownerTokenIdentifier"]),
+
+  subscriptions: defineTable({
+    workspaceId: v.optional(v.id("workspaces")),
+    // kept for backwards compat during migration
+    userId: v.optional(v.string()),
+    polarId: v.optional(v.string()),
+    polarPriceId: v.optional(v.string()),
+    currency: v.optional(v.string()),
+    interval: v.optional(v.string()),
+    status: v.optional(v.string()),
+    currentPeriodStart: v.optional(v.number()),
+    currentPeriodEnd: v.optional(v.number()),
+    cancelAtPeriodEnd: v.optional(v.boolean()),
+    amount: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    endsAt: v.optional(v.number()),
+    endedAt: v.optional(v.number()),
+    canceledAt: v.optional(v.number()),
+    customerCancellationReason: v.optional(v.string()),
+    customerCancellationComment: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    customFieldData: v.optional(v.any()),
+    customerId: v.optional(v.string()),
+  })
+    .index("userId", ["userId"])
+    .index("polarId", ["polarId"])
+    .index("by_workspace", ["workspaceId"]),
+
+  workspaceMembers: defineTable({
+    workspaceId: v.id("workspaces"),
+    userTokenIdentifier: v.string(),
+    role: v.union(v.literal("owner"), v.literal("member")),
+    invitedByTokenIdentifier: v.string(),
+    joinedAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_user", ["userTokenIdentifier"])
+    .index("by_workspace_user", ["workspaceId", "userTokenIdentifier"]),
+
+  workspaceInvites: defineTable({
+    workspaceId: v.id("workspaces"),
+    email: v.string(),
+    role: v.literal("member"),
+    token: v.string(),
+    invitedByTokenIdentifier: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_token", ["token"]),
+
+  socialAccounts: defineTable({
+    workspaceId: v.id("workspaces"),
+    platform: v.union(
+      v.literal("linkedin"),
+      v.literal("instagram"),
+      v.literal("x")
+    ),
+    platformAccountId: v.string(),
+    platformUsername: v.string(),
+    encryptedAccessToken: v.string(),
+    encryptedRefreshToken: v.optional(v.string()),
+    tokenExpiresAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("expired"),
+      v.literal("revoked")
+    ),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_platform", ["workspaceId", "platform"]),
+
+  postTemplates: defineTable({
+    workspaceId: v.id("workspaces"),
+    authorTokenIdentifier: v.string(),
+    recurrence: v.object({
+      frequency: v.union(
+        v.literal("daily"),
+        v.literal("weekly"),
+        v.literal("monthly")
+      ),
+      // weekly: 0=Sun, 1=Mon, ... 6=Sat
+      daysOfWeek: v.optional(v.array(v.number())),
+      // monthly: 1–28
+      dayOfMonth: v.optional(v.number()),
+      // "HH:MM" in workspace timezone
+      timeOfDay: v.string(),
+      endsAt: v.optional(v.number()),
+    }),
+    status: v.union(v.literal("active"), v.literal("paused"), v.literal("ended")),
+    createdAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_status", ["status"]),
+
+  postTemplateVariants: defineTable({
+    templateId: v.id("postTemplates"),
+    socialAccountId: v.id("socialAccounts"),
+    caption: v.optional(v.string()),
+    mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
+  })
+    .index("by_template", ["templateId"])
+    .index("by_template_account", ["templateId", "socialAccountId"]),
+
+  posts: defineTable({
+    workspaceId: v.id("workspaces"),
+    authorTokenIdentifier: v.string(),
+    templateId: v.optional(v.id("postTemplates")),
+    scheduledAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("scheduled"),
+      v.literal("published"),
+      v.literal("failed"),
+      v.literal("partial")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_status_scheduled", ["status", "scheduledAt"])
+    .index("by_template", ["templateId"]),
+
+  postVariants: defineTable({
+    postId: v.id("posts"),
+    socialAccountId: v.id("socialAccounts"),
+    caption: v.optional(v.string()),
+    mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
+  })
+    .index("by_post", ["postId"])
+    .index("by_post_account", ["postId", "socialAccountId"]),
+
+  publications: defineTable({
+    postId: v.id("posts"),
+    postVariantId: v.id("postVariants"),
+    socialAccountId: v.id("socialAccounts"),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("publishing"),
+      v.literal("published"),
+      v.literal("failed")
+    ),
+    scheduledAt: v.number(),
+    publishedAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+  })
+    .index("by_post", ["postId"])
+    .index("by_status_scheduled", ["status", "scheduledAt"]),
+
+  mediaItems: defineTable({
+    workspaceId: v.id("workspaces"),
+    uploadedByTokenIdentifier: v.string(),
+    r2Key: v.string(),
+    filename: v.string(),
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_created", ["workspaceId", "createdAt"]),
+
+  oauthStates: defineTable({
+    state: v.string(),
+    workspaceId: v.id("workspaces"),
+    userTokenIdentifier: v.string(),
+    platform: v.union(v.literal("linkedin"), v.literal("instagram"), v.literal("x")),
+    expiresAt: v.number(),
+    codeVerifier: v.optional(v.string()), // X PKCE only
+  }).index("by_state", ["state"]),
+
+  hashtagSets: defineTable({
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+    hashtags: v.array(v.string()),
+    createdAt: v.number(),
+  }).index("by_workspace", ["workspaceId"]),
+
+  aiUsage: defineTable({
+    workspaceId: v.id("workspaces"),
+    userTokenIdentifier: v.string(),
+    type: v.literal("caption_generation"),
+    createdAt: v.number(),
+  })
+    .index("by_workspace_created", ["workspaceId", "createdAt"]),
+
+  webhookEvents: defineTable({
+    type: v.string(),
+    polarEventId: v.string(),
+    createdAt: v.string(),
+    modifiedAt: v.string(),
+    data: v.any(),
+  })
+    .index("type", ["type"])
+    .index("polarEventId", ["polarEventId"]),
+});
