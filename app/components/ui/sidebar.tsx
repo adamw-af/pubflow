@@ -696,6 +696,8 @@ function SidebarMenuSubButton({
   })
 }
 
+export { sidebarMenuButtonVariants }
+
 export {
   Sidebar,
   SidebarContent,
