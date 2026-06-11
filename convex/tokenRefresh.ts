@@ -109,10 +109,12 @@ async function refreshX(refreshToken: string): Promise<RefreshResult> {
 
 async function refreshInstagram(refreshToken: string): Promise<RefreshResult> {
   const res = await fetch(
-    `https://graph.instagram.com/refresh_access_token?` +
+    `https://graph.facebook.com/v19.0/oauth/access_token?` +
       new URLSearchParams({
-        grant_type: "ig_refresh_token",
-        access_token: refreshToken,
+        grant_type: "fb_exchange_token",
+        client_id: process.env.FACEBOOK_APP_ID!,
+        client_secret: process.env.FACEBOOK_APP_SECRET!,
+        fb_exchange_token: refreshToken,
       })
   );
   if (!res.ok) throw new Error(`Instagram refresh failed: ${await res.text()}`);
