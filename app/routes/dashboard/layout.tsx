@@ -1,4 +1,5 @@
 import { getAuth } from "@clerk/react-router/server";
+import { useAuth } from "@clerk/react-router";
 import { redirect, useLoaderData } from "react-router";
 import { AppSidebar } from "~/components/dashboard/app-sidebar";
 import { SiteHeader } from "~/components/dashboard/site-header";
@@ -26,14 +27,19 @@ export async function loader(args: Route.LoaderArgs) {
 
 export default function DashboardLayout() {
   const { user } = useLoaderData();
+  const { isSignedIn } = useAuth();
+
+  // Auth is clearing (sign-out in progress) — render nothing to prevent flash
+  if (isSignedIn === false) return null;
+
   const workspace = useQuery(api.workspaces.getMyWorkspace);
   const subscriptionStatus = useQuery(api.subscriptions.checkUserSubscriptionStatus, {});
 
   const needsOnboarding =
     workspace === undefined || !workspace?.onboardingCompletedAt;
 
-  // Client-side subscription guard — Convex enforces auth at the data layer
-  if (subscriptionStatus !== undefined && !subscriptionStatus?.hasActiveSubscription) {
+  // Client-side subscription guard — only redirect if definitely signed in with no subscription
+  if (isSignedIn && subscriptionStatus !== undefined && !subscriptionStatus?.hasActiveSubscription) {
     if (typeof window !== "undefined") {
       window.location.href = "/subscription-required";
     }
