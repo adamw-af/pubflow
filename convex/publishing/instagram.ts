@@ -60,12 +60,10 @@ async function publishSingleMedia(
   }
   const { id: creationId } = await createRes.json();
 
-  // For videos, wait for processing
-  if (isVideo) {
-    const ready = await waitForVideoProcessing(accessToken, creationId);
-    if (!ready) {
-      return { success: false, error: "Instagram video processing timed out" };
-    }
+  // Wait for container to be ready (required for all media types)
+  const ready = await waitForContainerReady(accessToken, creationId);
+  if (!ready) {
+    return { success: false, error: isVideo ? "Instagram video processing timed out" : "Instagram image processing timed out" };
   }
 
   // Step 2: Publish
@@ -151,7 +149,7 @@ async function publishContainer(
   return { success: true, platformPostId: id };
 }
 
-async function waitForVideoProcessing(
+async function waitForContainerReady(
   accessToken: string,
   creationId: string,
   maxAttempts = 10
