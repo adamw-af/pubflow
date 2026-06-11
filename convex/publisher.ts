@@ -35,7 +35,7 @@ export const processScheduledPublications = internalAction({
 
         const accessToken = await decryptToken(socialAccount.encryptedAccessToken);
 
-        const mediaUrls = (variant.mediaItemIds ?? []).map(
+        const mediaUrls = data.mediaKeys.map(
           (key: string) => `${R2_PUBLIC_URL}/${key}`
         );
 
@@ -208,7 +208,13 @@ export const getPublicationData = internalQuery({
     const socialAccount = await ctx.db.get(publication.socialAccountId);
     if (!socialAccount) return null;
 
-    return { publication, variant, socialAccount };
+    const mediaKeys: string[] = [];
+    for (const id of variant.mediaItemIds ?? []) {
+      const item = await ctx.db.get(id);
+      if (item?.r2Key) mediaKeys.push(item.r2Key);
+    }
+
+    return { publication, variant, socialAccount, mediaKeys };
   },
 });
 
