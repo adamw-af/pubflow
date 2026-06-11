@@ -46,7 +46,7 @@ function getAuthorizationUrl(
 
     case "x":
       return (
-        `https://twitter.com/i/oauth2/authorize?` +
+        `https://x.com/i/oauth2/authorize?` +
         new URLSearchParams({
           response_type: "code",
           client_id: process.env.X_CLIENT_ID!,
