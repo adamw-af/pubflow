@@ -34,13 +34,13 @@ function getAuthorizationUrl(
 
     case "instagram":
       return (
-        `https://www.facebook.com/v19.0/dialog/oauth?` +
+        `https://www.instagram.com/oauth/authorize?` +
         new URLSearchParams({
           response_type: "code",
           client_id: process.env.FACEBOOK_APP_ID!,
           redirect_uri: callbackUrl,
           state,
-          scope: "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement",
+          scope: "instagram_business_basic,instagram_business_content_publish",
         })
       );
 
@@ -249,62 +249,45 @@ async function exchangeLinkedIn(code: string, callbackRequestUrl: string): Promi
 async function exchangeInstagram(code: string, callbackRequestUrl: string): Promise<TokenResult> {
   const callbackUrl = buildCallbackUrl(callbackRequestUrl, "instagram");
 
-  // Step 1: Exchange code for short-lived Facebook user access token
-  const shortTokenRes = await fetch(
-    `https://graph.facebook.com/v19.0/oauth/access_token?` +
-      new URLSearchParams({
-        client_id: process.env.FACEBOOK_APP_ID!,
-        client_secret: process.env.FACEBOOK_APP_SECRET!,
-        redirect_uri: callbackUrl,
-        code,
-      })
-  );
+  // Step 1: Exchange code for short-lived token
+  const shortTokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.FACEBOOK_APP_ID!,
+      client_secret: process.env.FACEBOOK_APP_SECRET!,
+      grant_type: "authorization_code",
+      redirect_uri: callbackUrl,
+      code,
+    }),
+  });
   if (!shortTokenRes.ok) throw new Error(`Instagram token exchange failed: ${await shortTokenRes.text()}`);
-  const { access_token: shortToken } = await shortTokenRes.json();
+  const { access_token: shortToken, user_id } = await shortTokenRes.json();
 
-  // Step 2: Exchange short-lived for long-lived token (60 days)
+  // Step 2: Exchange for long-lived token (60 days)
   const longTokenRes = await fetch(
-    `https://graph.facebook.com/v19.0/oauth/access_token?` +
+    `https://graph.instagram.com/access_token?` +
       new URLSearchParams({
-        grant_type: "fb_exchange_token",
-        client_id: process.env.FACEBOOK_APP_ID!,
+        grant_type: "ig_exchange_token",
         client_secret: process.env.FACEBOOK_APP_SECRET!,
-        fb_exchange_token: shortToken,
+        access_token: shortToken,
       })
   );
   if (!longTokenRes.ok) throw new Error("Failed to exchange for long-lived Instagram token");
   const { access_token: longToken, expires_in } = await longTokenRes.json();
 
-  // Step 3: Get user's Facebook Pages
-  const pagesRes = await fetch(
-    `https://graph.facebook.com/v19.0/me/accounts?access_token=${longToken}`
+  // Step 3: Get username
+  const userRes = await fetch(
+    `https://graph.instagram.com/me?fields=user_id,username&access_token=${longToken}`
   );
-  if (!pagesRes.ok) throw new Error("Failed to fetch Facebook pages");
-  const { data: pages } = await pagesRes.json();
+  const igUser = userRes.ok ? await userRes.json() : { username: String(user_id) };
 
-  // Step 4: Find the Instagram Business Account linked to a page
-  for (const page of pages ?? []) {
-    const igRes = await fetch(
-      `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
-    );
-    if (!igRes.ok) continue;
-    const { instagram_business_account } = await igRes.json();
-    if (!instagram_business_account) continue;
-
-    const igUserRes = await fetch(
-      `https://graph.facebook.com/v19.0/${instagram_business_account.id}?fields=username&access_token=${page.access_token}`
-    );
-    const igUser = igUserRes.ok ? await igUserRes.json() : { username: instagram_business_account.id };
-
-    return {
-      platformAccountId: instagram_business_account.id,
-      platformUsername: igUser.username ?? instagram_business_account.id,
-      accessToken: page.access_token,
-      tokenExpiresAt: expires_in ? Date.now() + expires_in * 1000 : undefined,
-    };
-  }
-
-  throw new Error("No Instagram Business Account found. Make sure your Instagram is a Professional account connected to a Facebook Page.");
+  return {
+    platformAccountId: String(user_id),
+    platformUsername: igUser.username ?? String(user_id),
+    accessToken: longToken,
+    tokenExpiresAt: expires_in ? Date.now() + expires_in * 1000 : undefined,
+  };
 }
 
 async function exchangeX(code: string, codeVerifier: string, callbackRequestUrl: string): Promise<TokenResult> {
