@@ -49,7 +49,7 @@ async function publishSingleMedia(
   }
 
   const createRes = await fetch(
-    `https://graph.instagram.com/v21.0/${igUserId}/media?` +
+    `https://graph.instagram.com/v21.0/me/media?` +
       new URLSearchParams(params),
     { method: "POST" }
   );
@@ -95,7 +95,7 @@ async function publishCarousel(
     }
 
     const res = await fetch(
-      `https://graph.instagram.com/v21.0/${igUserId}/media?` +
+      `https://graph.instagram.com/v21.0/me/media?` +
         new URLSearchParams(params),
       { method: "POST" }
     );
@@ -110,7 +110,7 @@ async function publishCarousel(
 
   // Create carousel container
   const carouselRes = await fetch(
-    `https://graph.instagram.com/v21.0/${igUserId}/media?` +
+    `https://graph.instagram.com/v21.0/me/media?` +
       new URLSearchParams({
         media_type: "CAROUSEL",
         children: itemIds.join(","),
@@ -135,7 +135,7 @@ async function publishContainer(
   creationId: string
 ): Promise<PublishResult> {
   const res = await fetch(
-    `https://graph.instagram.com/v21.0/${igUserId}/media_publish?` +
+    `https://graph.instagram.com/v21.0/me/media_publish?` +
       new URLSearchParams({
         creation_id: creationId,
         access_token: accessToken,

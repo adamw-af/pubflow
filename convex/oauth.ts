@@ -276,14 +276,14 @@ async function exchangeInstagram(code: string, callbackRequestUrl: string): Prom
   if (!longTokenRes.ok) throw new Error("Failed to exchange for long-lived Instagram token");
   const { access_token: longToken, expires_in } = await longTokenRes.json();
 
-  // Step 3: Get username
+  // Step 3: Get id and username
   const userRes = await fetch(
-    `https://graph.instagram.com/me?fields=user_id,username&access_token=${longToken}`
+    `https://graph.instagram.com/me?fields=id,username&access_token=${longToken}`
   );
-  const igUser = userRes.ok ? await userRes.json() : { username: String(user_id) };
+  const igUser = userRes.ok ? await userRes.json() : {};
 
   return {
-    platformAccountId: String(user_id),
+    platformAccountId: igUser.id ?? String(user_id),
     platformUsername: igUser.username ?? String(user_id),
     accessToken: longToken,
     tokenExpiresAt: expires_in ? Date.now() + expires_in * 1000 : undefined,
