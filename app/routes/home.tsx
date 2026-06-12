@@ -2,7 +2,7 @@ import { getAuth } from "@clerk/react-router/server";
 import { ConvexHttpClient } from "convex/browser";
 import { ArrowRight, Calendar, Check, Clock, Layers } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, redirect } from "react-router";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 import { api } from "../../convex/_generated/api";
@@ -24,9 +24,18 @@ export async function loader(args: Route.LoaderArgs) {
       : Promise.resolve(null),
     convex.action(api.subscriptions.getAvailablePlans).catch(() => ({ items: [], pagination: null })),
   ]);
+
+  if (userId) {
+    if (subscriptionData?.hasActiveSubscription) {
+      throw redirect("/dashboard");
+    } else {
+      throw redirect("/subscription-required");
+    }
+  }
+
   return {
-    isSignedIn: !!userId,
-    hasActiveSubscription: subscriptionData?.hasActiveSubscription || false,
+    isSignedIn: false,
+    hasActiveSubscription: false,
     plans,
   };
 }

@@ -36,7 +36,7 @@ export default function DashboardLayout() {
   const subscriptionStatus = useQuery(api.subscriptions.checkUserSubscriptionStatus, {});
 
   const needsOnboarding =
-    workspace === undefined || !workspace?.onboardingCompletedAt;
+    isSignedIn === true && (workspace === undefined || !workspace?.onboardingCompletedAt);
 
   // Client-side subscription guard — only redirect if definitely signed in with no subscription
   if (isSignedIn && subscriptionStatus !== undefined && !subscriptionStatus?.hasActiveSubscription) {
