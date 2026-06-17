@@ -12,6 +12,10 @@ _Avoid_: Customer, member, account
 The top-level billing and ownership unit. Holds a subscription tier, timezone, and owns Social Accounts. Can have multiple Users on Premium tier. Has an IANA timezone string used to interpret scheduled times.
 _Avoid_: Organization, team, account
 
+**Trial**:
+A time-limited state a new Workspace begins in before any paid subscription: full access to reach the product's "aha" moment (connect an account, schedule a first Post) without a credit card. Working shape: 7 days, no card required. The paywall is presented when the Trial expires or the Workspace exceeds free limits (more than one connected Social Account). Distinct from the Polar subscription `status` — a Workspace on Trial has no active subscription yet.
+_Avoid_: Free tier, freemium, demo
+
 **Workspace Member**:
 A User with access to a Workspace. Has a role: `owner` (full access including billing and Social Account management) or `member` (can create, edit, and schedule Posts only). The owner is the User who created the Workspace.
 _Avoid_: Team member, collaborator, user
@@ -21,8 +25,12 @@ A connected profile on a specific social platform (e.g. `@adam` on Twitter). Bel
 _Avoid_: Channel, profile, connection
 
 **Platform**:
-A supported social network. v1 supports LinkedIn, Instagram, and X (Twitter). Future platforms: Facebook, TikTok, YouTube, Bluesky, Threads, Pinterest.
+A supported social network. v1 supports LinkedIn, Instagram, and X (Twitter). v2 adds Facebook and Threads (reusing the Meta integration), Bluesky (no app review), and TikTok and YouTube Shorts (video-only, separate audits). Pinterest is deferred beyond v2.
 _Avoid_: Network, channel, integration
+
+**Platform Capability**:
+The declarative description of what a Platform accepts: max caption length, whether media is required, whether video is required, max video duration, allowed aspect ratios, multi-image support, whether a title is required (YouTube), and whether a privacy/disclosure setting applies (TikTok). One canonical capability descriptor per Platform. The composer validates each Post Variant against its target's Platform Capability and surfaces per-platform errors inline; it drives both validation and the composer UI.
+_Avoid_: Constraint, rule, spec, platform config
 
 **Post**:
 A unit of content created by a User, with a scheduled time and one or more target Social Accounts. A Post holds the canonical intent — what to publish, when, and where.
