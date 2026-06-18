@@ -64,6 +64,38 @@ describe("TikTok Platform Capability validation", () => {
   });
 });
 
+// YouTube Shorts is video-only (videoRequired) and additionally requires a title
+// (titleRequired) — the caption becomes the description. Duration/aspect are
+// carried for the UI but YouTube itself rejects out-of-spec video at publish time
+// (surfaced via the status poll, ADR 0007), so they are not pre-validated here.
+describe("YouTube Platform Capability validation", () => {
+  const youtube = getPlatformMetadata("youtube").capability;
+
+  it("requires a video and a title", () => {
+    expect(youtube.videoRequired).toBe(true);
+    expect(youtube.mediaRequired).toBe(true);
+    expect(youtube.titleRequired).toBe(true);
+    expect(youtube.maxVideoDurationSec).toBeGreaterThan(0);
+  });
+
+  it("rejects a titleless video post (a title is required)", () => {
+    const errors = validateAgainstCapability(youtube, {
+      caption: "no title",
+      media: [{ isVideo: true }],
+    });
+    expect(errors.map((e) => e.code)).toContain("title_required");
+  });
+
+  it("accepts a single video with a title", () => {
+    const errors = validateAgainstCapability(youtube, {
+      caption: "a clip",
+      title: "My Short",
+      media: [{ isVideo: true }],
+    });
+    expect(errors).toEqual([]);
+  });
+});
+
 // The Threads descriptor must drive composer/schedule-time validation: a 500-char
 // cap, text-only allowed (no media required), and no video (reuses the async
 // pipeline in Wave 2, ADR 0007) — so a video must be rejected before publish.

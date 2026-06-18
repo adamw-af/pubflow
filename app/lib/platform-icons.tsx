@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Linkedin, Instagram, Facebook, AtSign, Music2 } from "lucide-react";
+import { Linkedin, Instagram, Facebook, AtSign, Music2, Youtube } from "lucide-react";
 
 // The registry (convex/platforms/metadata.ts) is pure data and exposes each
 // platform's `icon` as a string key. Icons are React components, so this map is
@@ -13,6 +13,7 @@ const ICONS: Record<string, (className: string) => ReactNode> = {
   facebook: (className) => <Facebook className={className} />,
   threads: (className) => <AtSign className={className} />,
   tiktok: (className) => <Music2 className={className} />,
+  youtube: (className) => <Youtube className={className} />,
 };
 
 /** Render a platform's icon from its registry `icon` key. */

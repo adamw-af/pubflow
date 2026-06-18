@@ -1,18 +1,23 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { getPlatformMetadata, tiktokOptionsValidator } from "./platforms/registry";
+import {
+  getPlatformMetadata,
+  tiktokOptionsValidator,
+  youtubeOptionsValidator,
+} from "./platforms/registry";
 import {
   validateAgainstCapability,
   type CapabilityError,
 } from "./platforms/capabilityValidation";
-import type { TikTokVariantOptions } from "./platforms/types";
+import type { TikTokVariantOptions, YouTubeVariantOptions } from "./platforms/types";
 
 const variantArg = v.object({
   socialAccountId: v.id("socialAccounts"),
   caption: v.optional(v.string()),
   mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
   tiktokOptions: v.optional(tiktokOptionsValidator),
+  youtubeOptions: v.optional(youtubeOptionsValidator),
 });
 
 type VariantArg = {
@@ -20,6 +25,7 @@ type VariantArg = {
   caption?: string;
   mediaItemIds?: Id<"mediaItems">[];
   tiktokOptions?: TikTokVariantOptions;
+  youtubeOptions?: YouTubeVariantOptions;
 };
 
 /**
@@ -49,6 +55,7 @@ async function validateVariant(
   const capability = getPlatformMetadata(account.platform).capability;
   const errors = validateAgainstCapability(capability, {
     caption: variant.caption ?? "",
+    title: variant.youtubeOptions?.title,
     media,
   });
 
@@ -145,6 +152,7 @@ async function insertVariantsAndPublications(
       caption: variant.caption,
       mediaItemIds: variant.mediaItemIds,
       tiktokOptions: variant.tiktokOptions,
+      youtubeOptions: variant.youtubeOptions,
     });
 
     if (scheduledAt === undefined) continue;

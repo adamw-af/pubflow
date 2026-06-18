@@ -1,6 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { platformValidator, tiktokOptionsValidator } from "./platforms/registry";
+import {
+  platformValidator,
+  tiktokOptionsValidator,
+  youtubeOptionsValidator,
+} from "./platforms/registry";
 
 export default defineSchema({
   users: defineTable({
@@ -121,6 +125,8 @@ export default defineSchema({
     mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
     // TikTok privacy/disclosure settings (capability-aware variant field).
     tiktokOptions: v.optional(tiktokOptionsValidator),
+    // YouTube per-video metadata, i.e. the required title (capability-aware).
+    youtubeOptions: v.optional(youtubeOptionsValidator),
   })
     .index("by_template", ["templateId"])
     .index("by_template_account", ["templateId", "socialAccountId"]),
@@ -154,6 +160,8 @@ export default defineSchema({
     mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
     // TikTok privacy/disclosure settings (capability-aware variant field).
     tiktokOptions: v.optional(tiktokOptionsValidator),
+    // YouTube per-video metadata, i.e. the required title (capability-aware).
+    youtubeOptions: v.optional(youtubeOptionsValidator),
   })
     .index("by_post", ["postId"])
     .index("by_post_account", ["postId", "socialAccountId"]),
