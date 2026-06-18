@@ -13,26 +13,39 @@ import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { VariantEditor } from "./VariantEditor";
-import { getPlatformMetadata } from "../../../convex/platforms/metadata";
+import {
+  getPlatformMetadata,
+  PLATFORM_METADATA,
+} from "../../../convex/platforms/metadata";
 import { validateAgainstCapability } from "../../../convex/platforms/capabilityValidation";
 import type { TikTokVariantOptions } from "../../../convex/platforms/types";
-import { CalendarIcon, Linkedin, Instagram, Loader2, Music2 } from "lucide-react";
+import { platformIcon, platformBrandColor } from "~/lib/platform-icons";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
-const PLATFORM_ICONS: Record<string, React.ReactNode> = {
-  linkedin: <Linkedin className="size-3.5" />,
-  instagram: <Instagram className="size-3.5" />,
-  x: <span className="font-bold text-xs leading-none">𝕏</span>,
-  tiktok: <Music2 className="size-3.5" />,
-};
-
-const PLATFORM_COLORS: Record<string, string> = {
-  linkedin: "bg-blue-600",
-  instagram: "bg-gradient-to-br from-purple-500 to-pink-500",
-  x: "bg-black",
-  tiktok: "bg-black",
-};
+/**
+ * A platform's icon in its brand-coloured chip, derived entirely from the
+ * registry (icon key + `--ch-<id>` token) so every connected Platform renders
+ * consistently — no per-platform maps that silently miss new platforms.
+ */
+function PlatformBubble({
+  platform,
+  className = "size-4",
+}: {
+  platform: string;
+  className?: string;
+}) {
+  const iconKey = PLATFORM_METADATA[platform as keyof typeof PLATFORM_METADATA]?.icon ?? platform;
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full text-white shrink-0 ${className}`}
+      style={{ background: platformBrandColor(platform) }}
+    >
+      {platformIcon(iconKey, "size-2.5")}
+    </span>
+  );
+}
 
 type VariantContent = {
   caption: string;
@@ -270,9 +283,7 @@ export function PostComposer() {
                       : "border-border bg-background hover:bg-muted"
                   }`}
                 >
-                  <span className={`size-4 rounded-full flex items-center justify-center text-white ${PLATFORM_COLORS[account.platform]}`}>
-                    {PLATFORM_ICONS[account.platform]}
-                  </span>
+                  <PlatformBubble platform={account.platform} />
                   @{account.platformUsername}
                 </button>
               );
@@ -312,7 +323,7 @@ export function PostComposer() {
               <TabsList className="w-full rounded-none rounded-t-lg border-b bg-muted/30">
                 {activeAccounts.map((acc) => (
                   <TabsTrigger key={acc._id} value={acc._id} className="flex items-center gap-1.5">
-                    {PLATFORM_ICONS[acc.platform]}
+                    <PlatformBubble platform={acc.platform} className="size-3.5" />
                     @{acc.platformUsername}
                     {(variantErrors[acc._id]?.length ?? 0) > 0 && (
                       <Badge variant="destructive" className="ml-1 h-4 text-[10px]">!</Badge>

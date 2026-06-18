@@ -47,6 +47,7 @@ const STEPS = ["Workspace", "Connect", "Ready"];
 
 export function OnboardingWizard() {
   const workspace = useQuery(api.workspaces.getMyWorkspace);
+  const access = useQuery(api.subscriptions.getWorkspaceAccess, {});
   const accounts = useQuery(api.socialAccounts.listForCurrentWorkspace) ?? [];
   const updateWorkspace = useMutation(api.workspaces.updateWorkspace);
   const completeOnboarding = useMutation(api.workspaces.completeOnboarding);
@@ -74,6 +75,12 @@ export function OnboardingWizard() {
   }, [workspace]);
 
   const hasConnectedAccount = accounts.some((a) => a.status === "active");
+
+  // The server enforces the one-Social-Account free limit on Trial
+  // (oauth.upsertSocialAccount via computeWorkspaceAccess); mirror it here so
+  // connect tiles disable and explain why — same pattern as settings.tsx.
+  const canConnectAnother = access?.canConnectAnotherAccount ?? true;
+  const atLimit = access !== undefined && access !== null && !canConnectAnother;
 
   async function handleSaveWorkspace() {
     if (!name.trim()) {
@@ -219,16 +226,53 @@ export function OnboardingWizard() {
                 </p>
               </div>
 
+              {/* Trial state — positive countdown while there's headroom (US#37) */}
+              {access?.state === "trial" && !atLimit && (
+                <div className="rounded-lg border border-dashed bg-muted/50 px-4 py-3 text-sm">
+                  <p className="font-medium">
+                    You're on a 7-day free trial
+                    {access.trialDaysRemaining !== undefined
+                      ? ` — ${access.trialDaysRemaining} day${
+                          access.trialDaysRemaining === 1 ? "" : "s"
+                        } left`
+                      : ""}
+                  </p>
+                  <p className="text-muted-foreground">
+                    No card needed. Connect one account to get started.
+                  </p>
+                </div>
+              )}
+
+              {/* Free-limit notice — one connected account on Trial (US#30) */}
+              {atLimit && (
+                <div className="rounded-lg border border-dashed bg-muted/50 px-4 py-3 text-sm">
+                  <p className="font-medium">
+                    {access?.reason === "trial_expired"
+                      ? "Your trial has ended."
+                      : "You've connected your one free trial account."}
+                  </p>
+                  <p className="text-muted-foreground">
+                    <a href="/pricing" className="text-primary underline underline-offset-4">
+                      Subscribe
+                    </a>{" "}
+                    to connect more accounts.
+                  </p>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 {platformMetadata.map((platform) => {
                   const connected = accounts.some(
                     (a) => a.platform === platform.id && a.status === "active"
                   );
                   const isConnecting = connectingPlatform === platform.id;
+                  // On Trial at the free limit, only already-connected tiles stay
+                  // interactive; the server would reject any new connection.
+                  const blockedByLimit = atLimit && !connected;
 
                   const tile = (
                     <button
-                      disabled={isConnecting || !!connectingPlatform}
+                      disabled={isConnecting || !!connectingPlatform || blockedByLimit}
                       onClick={
                         platform.authKind === "credentials"
                           ? undefined
@@ -238,7 +282,7 @@ export function OnboardingWizard() {
                         connected
                           ? "border-primary bg-primary/5 cursor-default"
                           : "hover:bg-muted cursor-pointer"
-                      } disabled:opacity-50`}
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <span className="size-9 rounded-full bg-muted flex items-center justify-center shrink-0">
                         {isConnecting ? (
@@ -267,7 +311,7 @@ export function OnboardingWizard() {
                         key={platform.id}
                         platform={platform}
                         isConnected={connected}
-                        disabled={!!connectingPlatform}
+                        disabled={!!connectingPlatform || blockedByLimit}
                         trigger={tile}
                       />
                     );
