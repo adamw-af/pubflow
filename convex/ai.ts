@@ -12,6 +12,7 @@ const PLATFORM_GUIDELINES: Record<string, string> = {
   instagram: "Engaging, conversational, can use emojis. Up to 2200 chars. Relevant hashtags encouraged (5-15).",
   x: "Concise and punchy. Hard limit: 280 chars total. 1-2 hashtags max. Every word must earn its place.",
   bluesky: "Conversational and authentic, light on hashtags. Hard limit: 300 chars total. Plain links are fine.",
+  threads: "Casual, conversational, community-oriented. Hard limit: 500 chars total. Light on hashtags.",
 };
 
 export const generateCaption = action({

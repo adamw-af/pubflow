@@ -6,6 +6,7 @@ import { instagramAdapter } from "./instagram";
 import { xAdapter } from "./x";
 import { blueskyAdapter } from "./bluesky";
 import { facebookAdapter } from "./facebook";
+import { threadsAdapter } from "./threads";
 
 // ---------------------------------------------------------------------------
 // The registry — single source of truth for every Platform (ADR 0006).
@@ -34,6 +35,7 @@ export const adapters: Record<PlatformId, PlatformAdapter> = {
   x: xAdapter,
   bluesky: blueskyAdapter,
   facebook: facebookAdapter,
+  threads: threadsAdapter,
 };
 
 /** Resolve an adapter by id. Throws on an unknown platform. */

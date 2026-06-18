@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PLATFORM_IDS, getPlatformMetadata, platformMetadata } from "./metadata";
+import { validateAgainstCapability } from "./capabilityValidation";
 
 // metadata.ts is the browser-safe projection of the registry: the connect UI
 // and composer derive their platform list, labels and limits from here, so a
@@ -30,5 +31,37 @@ describe("platform metadata (browser-safe registry projection)", () => {
 
   it("throws for an unregistered platform", () => {
     expect(() => getPlatformMetadata("tiktok")).toThrow();
+  });
+});
+
+// The Threads descriptor must drive composer/schedule-time validation: a 500-char
+// cap, text-only allowed (no media required), and no video (reuses the async
+// pipeline in Wave 2, ADR 0007) — so a video must be rejected before publish.
+describe("Threads Platform Capability validation", () => {
+  const threads = getPlatformMetadata("threads").capability;
+
+  it("caps the caption at 500 characters", () => {
+    expect(threads.maxCaptionLength).toBe(500);
+    const errors = validateAgainstCapability(threads, {
+      caption: "x".repeat(501),
+      media: [],
+    });
+    expect(errors.map((e) => e.code)).toContain("caption_too_long");
+  });
+
+  it("accepts a text-only post (media is optional)", () => {
+    const errors = validateAgainstCapability(threads, {
+      caption: "just text",
+      media: [],
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects a video — Threads video is not yet supported", () => {
+    const errors = validateAgainstCapability(threads, {
+      caption: "a clip",
+      media: [{ isVideo: true }],
+    });
+    expect(errors.map((e) => e.code)).toContain("video_not_supported");
   });
 });
