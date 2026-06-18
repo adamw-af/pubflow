@@ -163,25 +163,32 @@ export const oauthCallback = httpAction(async (ctx, request) => {
     if (adapter.auth.kind !== "oauth") {
       return failureRedirect("unsupported_flow");
     }
-    const { platformAccountId, platformUsername, accessToken, refreshToken, tokenExpiresAt } =
-      await adapter.auth.exchangeCode({
-        code,
-        codeVerifier: oauthState.codeVerifier,
-        callbackUrl: callbackUrlFor(platform),
-      });
-
-    const encryptedAccessToken = await encryptToken(accessToken);
-    const encryptedRefreshToken = refreshToken ? await encryptToken(refreshToken) : undefined;
-
-    await ctx.runMutation(internal.oauth.upsertSocialAccount, {
-      workspaceId: oauthState.workspaceId,
-      platform,
-      platformAccountId,
-      platformUsername,
-      encryptedAccessToken,
-      encryptedRefreshToken,
-      tokenExpiresAt,
+    const exchanged = await adapter.auth.exchangeCode({
+      code,
+      codeVerifier: oauthState.codeVerifier,
+      callbackUrl: callbackUrlFor(platform),
     });
+
+    // Most Platforms map one grant to a single account; Facebook maps one grant
+    // to many Pages, so normalize to an array and connect each.
+    const accounts = Array.isArray(exchanged) ? exchanged : [exchanged];
+    if (accounts.length === 0) {
+      return failureRedirect("no_accounts");
+    }
+
+    for (const account of accounts) {
+      await ctx.runMutation(internal.oauth.upsertSocialAccount, {
+        workspaceId: oauthState.workspaceId,
+        platform,
+        platformAccountId: account.platformAccountId,
+        platformUsername: account.platformUsername,
+        encryptedAccessToken: await encryptToken(account.accessToken),
+        encryptedRefreshToken: account.refreshToken
+          ? await encryptToken(account.refreshToken)
+          : undefined,
+        tokenExpiresAt: account.tokenExpiresAt,
+      });
+    }
 
     await ctx.runMutation(internal.oauth.deleteOAuthState, { state });
 

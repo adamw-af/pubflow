@@ -103,6 +103,7 @@ http.route({
 http.route({ path: "/oauth/callback/linkedin", method: "GET", handler: oauthCallback });
 http.route({ path: "/oauth/callback/instagram", method: "GET", handler: oauthCallback });
 http.route({ path: "/oauth/callback/x", method: "GET", handler: oauthCallback });
+http.route({ path: "/oauth/callback/facebook", method: "GET", handler: oauthCallback });
 
 // Log that routes are configured
 console.log("HTTP routes configured");
