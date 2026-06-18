@@ -23,7 +23,7 @@ export function CharacterCounter({ platform, count }: CharacterCounterProps) {
         isOver
           ? "text-destructive font-medium"
           : isWarning
-            ? "text-amber-500"
+            ? "text-(--warning-500)"
             : "text-muted-foreground"
       }
     >
