@@ -91,4 +91,28 @@ describe("validateAgainstCapability", () => {
     );
     expect(errors).toEqual([]);
   });
+
+  it("flags a missing title when the Platform requires one (YouTube)", () => {
+    const errors = validateAgainstCapability(
+      { ...baseCapability, titleRequired: true },
+      { caption: "a short", media: [{ isVideo: true }] }
+    );
+    expect(errors.map((e) => e.code)).toContain("title_required");
+  });
+
+  it("flags a blank/whitespace title when the Platform requires one", () => {
+    const errors = validateAgainstCapability(
+      { ...baseCapability, titleRequired: true },
+      { caption: "a short", title: "   ", media: [{ isVideo: true }] }
+    );
+    expect(errors.map((e) => e.code)).toContain("title_required");
+  });
+
+  it("accepts a variant carrying a title when a title is required", () => {
+    const errors = validateAgainstCapability(
+      { ...baseCapability, titleRequired: true },
+      { caption: "a short", title: "My Short", media: [{ isVideo: true }] }
+    );
+    expect(errors).toEqual([]);
+  });
 });

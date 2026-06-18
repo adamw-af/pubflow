@@ -109,7 +109,10 @@ export const processScheduledPublications = internalAction({
           caption: variant.caption ?? "",
           mediaUrls,
           platformAccountId: socialAccount.platformAccountId,
-          options: variant.tiktokOptions ? { tiktok: variant.tiktokOptions } : undefined,
+          options:
+            variant.tiktokOptions || variant.youtubeOptions
+              ? { tiktok: variant.tiktokOptions, youtube: variant.youtubeOptions }
+              : undefined,
         });
 
         outcome = toOutcome(publishResult);
@@ -450,6 +453,7 @@ async function scheduleNextFromTemplate(
       caption: tv.caption,
       mediaItemIds: tv.mediaItemIds,
       tiktokOptions: tv.tiktokOptions,
+      youtubeOptions: tv.youtubeOptions,
     });
 
     await ctx.db.insert("publications", {

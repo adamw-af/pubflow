@@ -8,6 +8,7 @@ import { blueskyAdapter } from "./bluesky";
 import { facebookAdapter } from "./facebook";
 import { threadsAdapter } from "./threads";
 import { tiktokAdapter } from "./tiktok";
+import { youtubeAdapter } from "./youtube";
 
 // ---------------------------------------------------------------------------
 // The registry — single source of truth for every Platform (ADR 0006).
@@ -38,6 +39,7 @@ export const adapters: Record<PlatformId, PlatformAdapter> = {
   facebook: facebookAdapter,
   threads: threadsAdapter,
   tiktok: tiktokAdapter,
+  youtube: youtubeAdapter,
 };
 
 /** Resolve an adapter by id. Throws on an unknown platform. */
@@ -65,4 +67,11 @@ export const tiktokOptionsValidator = v.object({
   disclosureEnabled: v.boolean(),
   brandedContent: v.optional(v.boolean()),
   yourBrand: v.optional(v.boolean()),
+});
+
+// YouTube's required per-video metadata (the title), stored on the Post Variant
+// and passed to the adapter at publish time (mirrors YouTubeVariantOptions in
+// ./types). Shared by the schema and the posts mutations so they can't drift.
+export const youtubeOptionsValidator = v.object({
+  title: v.string(),
 });

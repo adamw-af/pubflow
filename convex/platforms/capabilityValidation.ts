@@ -18,6 +18,8 @@ export type MediaInput = {
 /** The slice of a Post Variant that capability validation looks at. */
 export type VariantInput = {
   caption: string;
+  /** The video title, for Platforms that require one (YouTube). */
+  title?: string;
   media: MediaInput[];
 };
 
@@ -53,6 +55,13 @@ export function validateAgainstCapability(
     errors.push({
       code: "video_required",
       message: "This platform requires a video.",
+    });
+  }
+
+  if (capability.titleRequired && !variant.title?.trim()) {
+    errors.push({
+      code: "title_required",
+      message: "This platform requires a title.",
     });
   }
 

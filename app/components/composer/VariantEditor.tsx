@@ -18,7 +18,9 @@ import type { CapabilityError } from "../../../convex/platforms/capabilityValida
 import type {
   TikTokPrivacyLevel,
   TikTokVariantOptions,
+  YouTubeVariantOptions,
 } from "../../../convex/platforms/types";
+import { Input } from "~/components/ui/input";
 import { MediaPicker } from "~/components/media/MediaPicker";
 import { Switch } from "~/components/ui/switch";
 import {
@@ -45,9 +47,12 @@ interface VariantEditorProps {
   errors?: CapabilityError[];
   /** TikTok privacy/disclosure settings (platforms where they apply). */
   tiktokOptions?: TikTokVariantOptions;
+  /** YouTube per-video metadata, i.e. the required title (platforms where it applies). */
+  youtubeOptions?: YouTubeVariantOptions;
   onChange: (caption: string) => void;
   onMediaChange: (ids: Id<"mediaItems">[]) => void;
   onTikTokOptionsChange?: (options: TikTokVariantOptions) => void;
+  onYouTubeOptionsChange?: (options: YouTubeVariantOptions) => void;
 }
 
 /** TikTok's default: SELF_ONLY is the only privacy level an unaudited app allows. */
@@ -71,9 +76,11 @@ export function VariantEditor({
   hashtagSets,
   errors = [],
   tiktokOptions,
+  youtubeOptions,
   onChange,
   onMediaChange,
   onTikTokOptionsChange,
+  onYouTubeOptionsChange,
 }: VariantEditorProps) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -81,6 +88,8 @@ export function VariantEditor({
   const generateCaption = useAction(api.ai.generateCaption);
 
   const isOverLimit = errors.some((e) => e.code === "caption_too_long");
+  const capability = getPlatformMetadata(platform).capability;
+  const titleMissing = errors.some((e) => e.code === "title_required");
 
   async function handleGenerate(mode: "write" | "adapt") {
     if (mode === "write" && !aiPrompt.trim()) {
@@ -115,6 +124,21 @@ export function VariantEditor({
       <div className="text-sm text-muted-foreground">
         @{accountUsername} · {platform}
       </div>
+
+      {capability.titleRequired && onYouTubeOptionsChange && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`yt-title-${accountUsername}`} className="text-sm">
+            Title
+          </Label>
+          <Input
+            id={`yt-title-${accountUsername}`}
+            placeholder="Title for your Short"
+            value={youtubeOptions?.title ?? ""}
+            onChange={(e) => onYouTubeOptionsChange({ title: e.target.value })}
+            className={titleMissing ? "border-destructive focus-visible:ring-destructive" : ""}
+          />
+        </div>
+      )}
 
       <div className="relative">
         <Textarea
@@ -188,10 +212,10 @@ export function VariantEditor({
       <MediaPicker
         selectedIds={mediaItemIds}
         onChange={onMediaChange}
-        maxItems={getPlatformMetadata(platform).capability.maxMediaCount}
+        maxItems={capability.maxMediaCount}
       />
 
-      {getPlatformMetadata(platform).capability.privacyDisclosureApplies &&
+      {capability.privacyDisclosureApplies &&
         onTikTokOptionsChange && (
           <TikTokOptionsFields
             options={tiktokOptions ?? DEFAULT_TIKTOK_OPTIONS}

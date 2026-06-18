@@ -12,7 +12,7 @@
 import type { CredentialField, PlatformCapability } from "./types";
 
 /** The canonical ordered list of supported platform ids. */
-export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook", "threads", "tiktok"] as const;
+export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook", "threads", "tiktok", "youtube"] as const;
 
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 
@@ -173,6 +173,32 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
       maxMediaCount: 1,
       titleRequired: false,
       privacyDisclosureApplies: true,
+    },
+  },
+  youtube: {
+    id: "youtube",
+    displayName: "YouTube",
+    icon: "youtube",
+    description: "Short-form vertical video",
+    authKind: "oauth",
+    capability: {
+      // A YouTube Short is a single video with a required title (the caption
+      // becomes the description, capped at 5000 chars). Video is required
+      // (mediaRequired + videoRequired) and only one item is allowed. Shorts run
+      // up to 3 minutes vertical; duration/aspect are carried for the UI, but
+      // YouTube is the source of truth — it rejects an out-of-spec video and the
+      // failure surfaces via the status poll (ADR 0007), so they are not
+      // pre-validated in the composer.
+      maxCaptionLength: 5000,
+      mediaRequired: true,
+      videoRequired: true,
+      videoSupported: true,
+      maxVideoDurationSec: 180,
+      allowedAspectRatios: ["9:16"],
+      multiImage: false,
+      maxMediaCount: 1,
+      titleRequired: true,
+      privacyDisclosureApplies: false,
     },
   },
 };
