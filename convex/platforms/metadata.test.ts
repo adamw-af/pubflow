@@ -30,7 +30,37 @@ describe("platform metadata (browser-safe registry projection)", () => {
   });
 
   it("throws for an unregistered platform", () => {
-    expect(() => getPlatformMetadata("tiktok")).toThrow();
+    expect(() => getPlatformMetadata("pinterest")).toThrow();
+  });
+});
+
+// TikTok is video-only (videoRequired) and carries the privacy/disclosure flag
+// the composer keys off (privacyDisclosureApplies). Duration/aspect are carried
+// for the UI but TikTok itself rejects out-of-spec video at publish time
+// (surfaced via the status poll, ADR 0007), so they are not pre-validated here.
+describe("TikTok Platform Capability validation", () => {
+  const tiktok = getPlatformMetadata("tiktok").capability;
+
+  it("requires a video and applies the privacy/disclosure setting", () => {
+    expect(tiktok.videoRequired).toBe(true);
+    expect(tiktok.mediaRequired).toBe(true);
+    expect(tiktok.privacyDisclosureApplies).toBe(true);
+    expect(tiktok.maxVideoDurationSec).toBeGreaterThan(0);
+  });
+
+  it("rejects a text-only post (a video is required)", () => {
+    const errors = validateAgainstCapability(tiktok, { caption: "no video", media: [] });
+    expect(errors.map((e) => e.code)).toEqual(
+      expect.arrayContaining(["media_required", "video_required"])
+    );
+  });
+
+  it("accepts a single video", () => {
+    const errors = validateAgainstCapability(tiktok, {
+      caption: "a clip",
+      media: [{ isVideo: true }],
+    });
+    expect(errors).toEqual([]);
   });
 });
 

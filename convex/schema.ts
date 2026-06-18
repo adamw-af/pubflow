@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { platformValidator } from "./platforms/registry";
+import { platformValidator, tiktokOptionsValidator } from "./platforms/registry";
 
 export default defineSchema({
   users: defineTable({
@@ -119,6 +119,8 @@ export default defineSchema({
     socialAccountId: v.id("socialAccounts"),
     caption: v.optional(v.string()),
     mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
+    // TikTok privacy/disclosure settings (capability-aware variant field).
+    tiktokOptions: v.optional(tiktokOptionsValidator),
   })
     .index("by_template", ["templateId"])
     .index("by_template_account", ["templateId", "socialAccountId"]),
@@ -131,6 +133,9 @@ export default defineSchema({
     status: v.union(
       v.literal("draft"),
       v.literal("scheduled"),
+      // Async video publishing (ADR 0007): at least one Publication is still
+      // being processed by the Platform; the Post is neither scheduled nor done.
+      v.literal("publishing"),
       v.literal("published"),
       v.literal("failed"),
       v.literal("partial")
@@ -147,6 +152,8 @@ export default defineSchema({
     socialAccountId: v.id("socialAccounts"),
     caption: v.optional(v.string()),
     mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
+    // TikTok privacy/disclosure settings (capability-aware variant field).
+    tiktokOptions: v.optional(tiktokOptionsValidator),
   })
     .index("by_post", ["postId"])
     .index("by_post_account", ["postId", "socialAccountId"]),
@@ -164,6 +171,11 @@ export default defineSchema({
     scheduledAt: v.number(),
     publishedAt: v.optional(v.number()),
     errorMessage: v.optional(v.string()),
+    // Async video publishing (ADR 0007): when an adapter's publish() returns
+    // in-progress, the Publication stays durably `publishing` with the platform
+    // job/upload handle (e.g. TikTok publish_id) stored here; the poll sweep
+    // reads `publishing` Publications carrying a handle and settles them.
+    platformJobHandle: v.optional(v.string()),
   })
     .index("by_post", ["postId"])
     .index("by_status_scheduled", ["status", "scheduledAt"]),

@@ -12,7 +12,7 @@
 import type { CredentialField, PlatformCapability } from "./types";
 
 /** The canonical ordered list of supported platform ids. */
-export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook", "threads"] as const;
+export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook", "threads", "tiktok"] as const;
 
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 
@@ -147,6 +147,32 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
       maxMediaCount: 20,
       titleRequired: false,
       privacyDisclosureApplies: false,
+    },
+  },
+  tiktok: {
+    id: "tiktok",
+    displayName: "TikTok",
+    icon: "tiktok",
+    description: "Short-form video",
+    authKind: "oauth",
+    capability: {
+      // A TikTok Post is a single video. The Content Posting API caps the title
+      // (caption) at 2200 characters. Video is required (mediaRequired +
+      // videoRequired); only one item is allowed. Duration/aspect limits are
+      // carried for the UI, but TikTok is the source of truth — it rejects an
+      // out-of-spec video and the failure surfaces via the status poll (ADR
+      // 0007), so they are not pre-validated in the composer. Privacy +
+      // commercial-disclosure settings are required (privacyDisclosureApplies).
+      maxCaptionLength: 2200,
+      mediaRequired: true,
+      videoRequired: true,
+      videoSupported: true,
+      maxVideoDurationSec: 600,
+      allowedAspectRatios: ["9:16", "1:1", "16:9"],
+      multiImage: false,
+      maxMediaCount: 1,
+      titleRequired: false,
+      privacyDisclosureApplies: true,
     },
   },
 };

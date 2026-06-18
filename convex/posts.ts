@@ -1,22 +1,25 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { getPlatformMetadata } from "./platforms/registry";
+import { getPlatformMetadata, tiktokOptionsValidator } from "./platforms/registry";
 import {
   validateAgainstCapability,
   type CapabilityError,
 } from "./platforms/capabilityValidation";
+import type { TikTokVariantOptions } from "./platforms/types";
 
 const variantArg = v.object({
   socialAccountId: v.id("socialAccounts"),
   caption: v.optional(v.string()),
   mediaItemIds: v.optional(v.array(v.id("mediaItems"))),
+  tiktokOptions: v.optional(tiktokOptionsValidator),
 });
 
 type VariantArg = {
   socialAccountId: Id<"socialAccounts">;
   caption?: string;
   mediaItemIds?: Id<"mediaItems">[];
+  tiktokOptions?: TikTokVariantOptions;
 };
 
 /**
@@ -141,6 +144,7 @@ async function insertVariantsAndPublications(
       socialAccountId: variant.socialAccountId,
       caption: variant.caption,
       mediaItemIds: variant.mediaItemIds,
+      tiktokOptions: variant.tiktokOptions,
     });
 
     if (scheduledAt === undefined) continue;
@@ -226,6 +230,7 @@ export const listPostsForCurrentWorkspace = query({
       v.union(
         v.literal("draft"),
         v.literal("scheduled"),
+        v.literal("publishing"),
         v.literal("published"),
         v.literal("failed"),
         v.literal("partial")

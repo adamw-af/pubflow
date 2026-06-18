@@ -7,6 +7,7 @@ import { xAdapter } from "./x";
 import { blueskyAdapter } from "./bluesky";
 import { facebookAdapter } from "./facebook";
 import { threadsAdapter } from "./threads";
+import { tiktokAdapter } from "./tiktok";
 
 // ---------------------------------------------------------------------------
 // The registry — single source of truth for every Platform (ADR 0006).
@@ -36,6 +37,7 @@ export const adapters: Record<PlatformId, PlatformAdapter> = {
   bluesky: blueskyAdapter,
   facebook: facebookAdapter,
   threads: threadsAdapter,
+  tiktok: tiktokAdapter,
 };
 
 /** Resolve an adapter by id. Throws on an unknown platform. */
@@ -49,3 +51,18 @@ export function getAdapter(id: string): PlatformAdapter {
 // registry so the union can never drift from the set of registered adapters.
 const platformLiterals = PLATFORM_IDS.map((id) => v.literal(id));
 export const platformValidator = v.union(platformLiterals[0], ...platformLiterals.slice(1));
+
+// TikTok's required privacy + commercial-disclosure settings, stored on the Post
+// Variant and passed to the adapter at publish time (mirrors TikTokVariantOptions
+// in ./types). Shared by the schema and the posts mutations so they can't drift.
+export const tiktokOptionsValidator = v.object({
+  privacyLevel: v.union(
+    v.literal("PUBLIC_TO_EVERYONE"),
+    v.literal("MUTUAL_FOLLOW_FRIENDS"),
+    v.literal("FOLLOWER_OF_CREATOR"),
+    v.literal("SELF_ONLY")
+  ),
+  disclosureEnabled: v.boolean(),
+  brandedContent: v.optional(v.boolean()),
+  yourBrand: v.optional(v.boolean()),
+});
