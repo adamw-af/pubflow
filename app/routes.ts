@@ -10,6 +10,10 @@ export default [
   route("sign-in/*", "routes/sign-in.tsx"),
   route("sign-up/*", "routes/sign-up.tsx"),
   route("pricing", "routes/pricing.tsx"),
+  route("privacy", "routes/privacy.tsx"),
+  route("terms", "routes/terms.tsx"),
+  route("data-deletion", "routes/data-deletion.tsx"),
+  route("contact", "routes/contact.tsx"),
   route("success", "routes/success.tsx"),
   route("subscription-required", "routes/subscription-required.tsx"),
   layout("routes/dashboard/layout.tsx", [
