@@ -19,7 +19,10 @@ import {
   PLATFORM_METADATA,
 } from "../../../convex/platforms/metadata";
 import { validateAgainstCapability } from "../../../convex/platforms/capabilityValidation";
-import type { TikTokVariantOptions } from "../../../convex/platforms/types";
+import type {
+  TikTokVariantOptions,
+  YouTubeVariantOptions,
+} from "../../../convex/platforms/types";
 import { platformIcon, platformBrandColor } from "~/lib/platform-icons";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
@@ -52,6 +55,7 @@ type VariantContent = {
   caption: string;
   mediaItemIds: Id<"mediaItems">[];
   tiktokOptions?: TikTokVariantOptions;
+  youtubeOptions?: YouTubeVariantOptions;
 };
 
 export function PostComposer() {
@@ -99,6 +103,7 @@ export function PostComposer() {
         caption: v.caption ?? "",
         mediaItemIds: (v.mediaItemIds ?? []) as Id<"mediaItems">[],
         tiktokOptions: v.tiktokOptions ?? undefined,
+        youtubeOptions: v.youtubeOptions ?? undefined,
       };
     }
     setVariants(variantMap);
@@ -134,7 +139,7 @@ export function PostComposer() {
     }));
     return validateAgainstCapability(
       getPlatformMetadata(account.platform).capability,
-      { caption: content?.caption ?? "", media }
+      { caption: content?.caption ?? "", title: content?.youtubeOptions?.title, media }
     );
   }
 
@@ -196,6 +201,16 @@ export function PostComposer() {
     }));
   }
 
+  function updateYouTubeOptions(accountId: string, youtubeOptions: YouTubeVariantOptions) {
+    setVariants((prev) => ({
+      ...prev,
+      [accountId]: {
+        ...(prev[accountId] ?? { caption: "", mediaItemIds: [] }),
+        youtubeOptions,
+      },
+    }));
+  }
+
   function buildScheduledAt(): number | undefined {
     if (!scheduleDate) return undefined;
     const [hh, mm] = scheduleTime.split(":").map(Number);
@@ -225,6 +240,7 @@ export function PostComposer() {
       caption: variants[acc._id]?.caption || undefined,
       mediaItemIds: variants[acc._id]?.mediaItemIds ?? [],
       tiktokOptions: variants[acc._id]?.tiktokOptions,
+      youtubeOptions: variants[acc._id]?.youtubeOptions,
     }));
 
     setIsSubmitting(true);
@@ -314,9 +330,11 @@ export function PostComposer() {
                 hashtagSets={hashtagSets}
                 errors={variantErrors[activeAccounts[0]._id] ?? []}
                 tiktokOptions={variants[activeAccounts[0]._id]?.tiktokOptions}
+                youtubeOptions={variants[activeAccounts[0]._id]?.youtubeOptions}
                 onChange={(c) => updateCaption(activeAccounts[0]._id, c)}
                 onMediaChange={(ids) => updateMedia(activeAccounts[0]._id, ids)}
                 onTikTokOptionsChange={(o) => updateTikTokOptions(activeAccounts[0]._id, o)}
+                onYouTubeOptionsChange={(o) => updateYouTubeOptions(activeAccounts[0]._id, o)}
               />
             </div>
           ) : (
@@ -342,9 +360,11 @@ export function PostComposer() {
                     hashtagSets={hashtagSets}
                     errors={variantErrors[acc._id] ?? []}
                     tiktokOptions={variants[acc._id]?.tiktokOptions}
+                    youtubeOptions={variants[acc._id]?.youtubeOptions}
                     onChange={(c) => updateCaption(acc._id, c)}
                     onMediaChange={(ids) => updateMedia(acc._id, ids)}
                     onTikTokOptionsChange={(o) => updateTikTokOptions(acc._id, o)}
+                    onYouTubeOptionsChange={(o) => updateYouTubeOptions(acc._id, o)}
                   />
                 </TabsContent>
               ))}

@@ -55,13 +55,22 @@ export type TikTokVariantOptions = {
 };
 
 /**
+ * YouTube's required per-video metadata. A Short must carry a title (the caption
+ * becomes the video description). Carried on the Post Variant and passed through
+ * to the adapter at publish time.
+ */
+export type YouTubeVariantOptions = {
+  title: string;
+};
+
+/**
  * Platform-specific structured options resolved from a Post Variant. Optional
  * and keyed per Platform so the shared publish contract stays uniform while
- * video Platforms (TikTok now, YouTube Shorts in #10) carry the extra fields
- * they require.
+ * video Platforms (TikTok, YouTube Shorts) carry the extra fields they require.
  */
 export type VariantOptions = {
   tiktok?: TikTokVariantOptions;
+  youtube?: YouTubeVariantOptions;
 };
 
 /** Everything an adapter needs to publish a single Post Variant. */
