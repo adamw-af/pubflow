@@ -29,17 +29,22 @@ export default function DashboardLayout() {
   const { user } = useLoaderData();
   const { isSignedIn } = useAuth();
 
+  // Hooks must run unconditionally and in a stable order — keep every useQuery
+  // above the early returns below.
+  const workspace = useQuery(api.workspaces.getMyWorkspace);
+  const access = useQuery(api.subscriptions.getWorkspaceAccess, {});
+
   // Auth is clearing (sign-out in progress) — render nothing to prevent flash
   if (isSignedIn === false) return null;
-
-  const workspace = useQuery(api.workspaces.getMyWorkspace);
-  const subscriptionStatus = useQuery(api.subscriptions.checkUserSubscriptionStatus, {});
 
   const needsOnboarding =
     isSignedIn === true && (workspace === undefined || !workspace?.onboardingCompletedAt);
 
-  // Client-side subscription guard — only redirect if definitely signed in with no subscription
-  if (isSignedIn && subscriptionStatus !== undefined && !subscriptionStatus?.hasActiveSubscription) {
+  // Access gate — value-first funnel: a Workspace on Trial or with an active
+  // Subscription gets the full dashboard. Only an expired Trial (no active
+  // Subscription) is sent to the paywall. `access` is null while there's no
+  // Workspace yet (onboarding), so brand-new users are never bounced here.
+  if (isSignedIn && access?.state === "expired") {
     if (typeof window !== "undefined") {
       window.location.href = "/subscription-required";
     }

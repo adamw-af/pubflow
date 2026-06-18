@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { TRIAL_DURATION_MS } from "./subscriptions";
 
 export const getMyWorkspace = query({
   handler: async (ctx) => {
@@ -34,11 +35,13 @@ export const createWorkspace = mutation({
 
     if (existing) return existing._id;
 
+    // New Workspaces start on a value-first Trial — full access, no credit card.
     return await ctx.db.insert("workspaces", {
       name: args.name,
       ownerTokenIdentifier: identity.subject,
       tier: "base",
       timezone: args.timezone,
+      trialEndsAt: Date.now() + TRIAL_DURATION_MS,
     });
   },
 });

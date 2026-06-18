@@ -4,6 +4,7 @@ import { action, httpAction, internalMutation, internalQuery } from "./_generate
 import { internal } from "./_generated/api";
 import { encryptToken } from "./lib/encryption";
 import { getAdapter, platformValidator, type PlatformId } from "./platforms/registry";
+import { computeWorkspaceAccess } from "./subscriptions";
 
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -276,6 +277,8 @@ export const upsertSocialAccount = internalMutation({
       .first();
 
     if (existing) {
+      // Re-connecting a known account is always allowed (no new row) — the free
+      // limit only gates adding a *new* Social Account.
       await ctx.db.patch(existing._id, {
         platformUsername: args.platformUsername,
         encryptedAccessToken: args.encryptedAccessToken,
@@ -284,6 +287,17 @@ export const upsertSocialAccount = internalMutation({
         status: "active",
       });
     } else {
+      // Enforce the access limit server-side so it can't be bypassed by hitting
+      // the OAuth callback or credential path directly. The Trial free limit is
+      // one account; paid tiers use their tier cap (see computeWorkspaceAccess).
+      const access = await computeWorkspaceAccess(ctx, args.workspaceId);
+      if (!access.canConnectAnotherAccount) {
+        throw new Error(
+          access.reason === "trial_expired"
+            ? "Trial expired — subscribe to connect a Social Account."
+            : "Account limit reached — upgrade your plan to connect another Social Account."
+        );
+      }
       await ctx.db.insert("socialAccounts", {
         workspaceId: args.workspaceId,
         platform: args.platform,

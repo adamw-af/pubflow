@@ -2,7 +2,15 @@ import { Polar } from "@polar-sh/sdk";
 import { v } from "convex/values";
 import { Webhook, WebhookVerificationError } from "standardwebhooks";
 import { api } from "./_generated/api";
-import { action, httpAction, mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import {
+  action,
+  httpAction,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 
 const TIER_ACCOUNT_LIMITS: Record<string, number> = {
   base: 25,
@@ -12,6 +20,102 @@ const TIER_ACCOUNT_LIMITS: Record<string, number> = {
 
 export const getTierAccountLimit = (tier: string): number =>
   TIER_ACCOUNT_LIMITS[tier] ?? 25;
+
+// ---------------------------------------------------------------------------
+// Workspace access — the single source of truth for the Trial funnel.
+//
+// Every consumer (dashboard gate, connect-another-account check, Trial
+// countdown, paywall copy) derives from this one decision instead of
+// scattering `status === "active"` checks. Mirrors how `validateAgainst
+// capability` is the single composer/schedule gate. See ADR 0008.
+// ---------------------------------------------------------------------------
+
+export const TRIAL_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+// Free limit during the Trial: exactly ONE connected Social Account (US#30).
+// Distinct from the paid tier caps in TIER_ACCOUNT_LIMITS — don't conflate them.
+const TRIAL_ACCOUNT_LIMIT = 1;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export type WorkspaceAccess = {
+  state: "trial" | "active" | "expired";
+  // Present only while `state === "trial"`.
+  trialDaysRemaining?: number;
+  // The free Trial limit is ONE Social Account; paid tiers use the tier cap.
+  canConnectAnotherAccount: boolean;
+  // Why the paywall, so the copy can explain it.
+  reason?: "trial_expired" | "account_limit";
+};
+
+/**
+ * Decide a Workspace's access state from its Subscription + Trial window.
+ *
+ * Resolution order:
+ *  1. Active Subscription  → `active`, paid tier cap applies.
+ *  2. `now < trialEndsAt`  → `trial`, free limit of one Social Account.
+ *  3. otherwise            → `expired` (this also covers the back-compat case
+ *     of a row with no `trialEndsAt`, so old workspaces don't crash the gate).
+ *
+ * A `revoked` (disconnected) Social Account does not count toward either limit.
+ */
+export async function computeWorkspaceAccess(
+  ctx: QueryCtx | MutationCtx,
+  workspaceId: Id<"workspaces">,
+  now: number = Date.now()
+): Promise<WorkspaceAccess> {
+  const workspace = await ctx.db.get(workspaceId);
+  if (!workspace) {
+    return { state: "expired", canConnectAnotherAccount: false, reason: "trial_expired" };
+  }
+
+  const subscription = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .first();
+
+  const accounts = await ctx.db
+    .query("socialAccounts")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .collect();
+  const connectedCount = accounts.filter((a) => a.status !== "revoked").length;
+
+  if (subscription?.status === "active") {
+    const canConnect = connectedCount < getTierAccountLimit(workspace.tier);
+    return {
+      state: "active",
+      canConnectAnotherAccount: canConnect,
+      reason: canConnect ? undefined : "account_limit",
+    };
+  }
+
+  const onTrial = workspace.trialEndsAt !== undefined && now < workspace.trialEndsAt;
+  if (onTrial) {
+    const canConnect = connectedCount < TRIAL_ACCOUNT_LIMIT;
+    return {
+      state: "trial",
+      trialDaysRemaining: Math.max(0, Math.ceil((workspace.trialEndsAt! - now) / DAY_MS)),
+      canConnectAnotherAccount: canConnect,
+      reason: canConnect ? undefined : "account_limit",
+    };
+  }
+
+  return { state: "expired", canConnectAnotherAccount: false, reason: "trial_expired" };
+}
+
+export const getWorkspaceAccess = query({
+  args: {},
+  handler: async (ctx): Promise<WorkspaceAccess | null> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
+      .unique();
+    if (!user?.workspaceId) return null;
+
+    return computeWorkspaceAccess(ctx, user.workspaceId);
+  },
+});
 
 const createCheckout = async ({
   customerEmail,
