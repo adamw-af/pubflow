@@ -11,8 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { CharacterCounter, PLATFORM_LIMITS } from "./CharacterCounter";
+import { CharacterCounter } from "./CharacterCounter";
 import { getPlatformMetadata, type PlatformId } from "../../../convex/platforms/metadata";
+import type { CapabilityError } from "../../../convex/platforms/capabilityValidation";
 import { MediaPicker } from "~/components/media/MediaPicker";
 import { cn } from "~/lib/utils";
 import { Sparkles, Hash, AlertTriangle } from "lucide-react";
@@ -30,6 +31,8 @@ interface VariantEditorProps {
   caption: string;
   mediaItemIds: Id<"mediaItems">[];
   hashtagSets: HashtagSet[];
+  /** Per-Platform Capability errors for this variant, surfaced inline. */
+  errors?: CapabilityError[];
   onChange: (caption: string) => void;
   onMediaChange: (ids: Id<"mediaItems">[]) => void;
 }
@@ -40,6 +43,7 @@ export function VariantEditor({
   caption,
   mediaItemIds,
   hashtagSets,
+  errors = [],
   onChange,
   onMediaChange,
 }: VariantEditorProps) {
@@ -48,8 +52,7 @@ export function VariantEditor({
   const [showAiInput, setShowAiInput] = useState(false);
   const generateCaption = useAction(api.ai.generateCaption);
 
-  const limit = PLATFORM_LIMITS[platform] ?? Infinity;
-  const isOverLimit = caption.length > limit;
+  const isOverLimit = errors.some((e) => e.code === "caption_too_long");
 
   async function handleGenerate(mode: "write" | "adapt") {
     if (mode === "write" && !aiPrompt.trim()) {
@@ -99,6 +102,20 @@ export function VariantEditor({
           </div>
         )}
       </div>
+
+      {errors.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {errors.map((e) => (
+            <li
+              key={e.code}
+              className="flex items-start gap-1.5 text-sm text-destructive"
+            >
+              <AlertTriangle className="size-3.5 mt-0.5 shrink-0" />
+              <span>{e.message}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
