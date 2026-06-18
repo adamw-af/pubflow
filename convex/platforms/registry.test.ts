@@ -7,12 +7,13 @@ import {
 } from "./registry";
 
 describe("platform registry", () => {
-  it("registers the v1 platforms plus Bluesky and Facebook", () => {
+  it("registers the v1 platforms plus Bluesky, Facebook and Threads", () => {
     expect([...PLATFORM_IDS].sort()).toEqual([
       "bluesky",
       "facebook",
       "instagram",
       "linkedin",
+      "threads",
       "x",
     ]);
   });
@@ -22,6 +23,7 @@ describe("platform registry", () => {
     expect(getAdapter("x").id).toBe("x");
     expect(getAdapter("bluesky").displayName).toBe("Bluesky");
     expect(getAdapter("facebook").displayName).toBe("Facebook");
+    expect(getAdapter("threads").displayName).toBe("Threads");
   });
 
   it("throws for an unknown platform id", () => {

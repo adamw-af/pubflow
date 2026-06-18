@@ -12,7 +12,7 @@
 import type { CredentialField, PlatformCapability } from "./types";
 
 /** The canonical ordered list of supported platform ids. */
-export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook"] as const;
+export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook", "threads"] as const;
 
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 
@@ -124,6 +124,27 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
       videoSupported: false,
       multiImage: true,
       maxMediaCount: 10,
+      titleRequired: false,
+      privacyDisclosureApplies: false,
+    },
+  },
+  threads: {
+    id: "threads",
+    displayName: "Threads",
+    icon: "threads",
+    description: "Text and photos on Threads",
+    authKind: "oauth",
+    capability: {
+      // Threads caps a post at 500 characters; text-only posts are allowed, so
+      // media is optional. Video reuses the async pipeline (ADR 0007, Wave 2),
+      // so it is not accepted yet (videoSupported: false). Carousels allow up to
+      // 20 images.
+      maxCaptionLength: 500,
+      mediaRequired: false,
+      videoRequired: false,
+      videoSupported: false,
+      multiImage: true,
+      maxMediaCount: 20,
       titleRequired: false,
       privacyDisclosureApplies: false,
     },
