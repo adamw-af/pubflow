@@ -87,8 +87,12 @@ export type OAuthAdapter = {
   usesPKCE?: boolean;
   /** Build the authorization URL the user is redirected to. */
   authUrl: (args: AuthUrlArgs) => string;
-  /** Exchange an authorization code for tokens + account identity. */
-  exchangeCode: (args: ExchangeArgs) => Promise<TokenResult>;
+  /**
+   * Exchange an authorization code for tokens + account identity. Most
+   * Platforms map one OAuth grant to a single account; Facebook maps one grant
+   * to many Pages, so an array may be returned and the callback connects each.
+   */
+  exchangeCode: (args: ExchangeArgs) => Promise<TokenResult | TokenResult[]>;
   /** Refresh an access token. Throws if the Platform does not support it. */
   refreshToken: (refreshToken: string) => Promise<RefreshResult>;
 };

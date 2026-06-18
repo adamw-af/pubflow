@@ -75,6 +75,79 @@ describe("beginOAuthFlow (registry-wired OAuth, no regression)", () => {
   });
 });
 
+describe("oauthCallback — Facebook maps one grant to many Pages", () => {
+  let restore: () => void = () => {};
+  afterEach(() => restore());
+
+  it("connects one active Social Account per admin'd Page, tokens encrypted", async () => {
+    process.env.TOKEN_ENCRYPTION_KEY = btoa("0".repeat(32));
+    process.env.FACEBOOK_APP_ID = "app-id";
+    process.env.FACEBOOK_APP_SECRET = "app-secret";
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    // Seed a valid OAuth state for the facebook flow.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("oauthStates", {
+        state: "fb-state",
+        workspaceId: workspaceId as Id<"workspaces">,
+        userTokenIdentifier: IDENTITY.subject,
+        platform: "facebook",
+        expiresAt: Date.now() + 60_000,
+      });
+    });
+
+    ({ restore } = installFetchStub([
+      {
+        match: (u) => u.includes("/oauth/access_token") && u.includes("code="),
+        respond: () => jsonResponse({ access_token: "short-user-token" }),
+      },
+      {
+        match: (u) => u.includes("/oauth/access_token") && u.includes("fb_exchange_token"),
+        respond: () => jsonResponse({ access_token: "long-user-token", expires_in: 5184000 }),
+      },
+      {
+        match: (u) => u.includes("/me/accounts"),
+        respond: () =>
+          jsonResponse({
+            data: [
+              { id: "pageA", name: "Page A", access_token: "page-a-token" },
+              { id: "pageB", name: "Page B", access_token: "page-b-token" },
+            ],
+          }),
+      },
+    ]));
+
+    const res = await t.fetch("/oauth/callback/facebook?code=auth-code&state=fb-state", {
+      method: "GET",
+    });
+    // The callback redirects back to the app on success.
+    expect(res.status).toBe(302);
+
+    const accounts = await t.run(async (ctx) =>
+      ctx.db
+        .query("socialAccounts")
+        .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId as Id<"workspaces">))
+        .collect()
+    );
+
+    expect(accounts).toHaveLength(2);
+    expect(accounts.every((a) => a.platform === "facebook")).toBe(true);
+    expect(accounts.every((a) => a.status === "active")).toBe(true);
+    expect(accounts.map((a) => a.platformAccountId).sort()).toEqual(["pageA", "pageB"]);
+    expect(accounts.map((a) => a.platformUsername).sort()).toEqual(["Page A", "Page B"]);
+    // Page tokens are stored encrypted, never in the clear.
+    for (const a of accounts) {
+      expect(a.encryptedAccessToken).not.toBe("page-a-token");
+      expect(a.encryptedAccessToken).not.toBe("page-b-token");
+    }
+
+    // The one-time state is consumed.
+    const states = await t.run(async (ctx) => ctx.db.query("oauthStates").collect());
+    expect(states).toHaveLength(0);
+  });
+});
+
 describe("connectWithCredentials (credential platforms, e.g. Bluesky)", () => {
   let restore: () => void = () => {};
   afterEach(() => restore());

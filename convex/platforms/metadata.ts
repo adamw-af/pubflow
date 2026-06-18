@@ -12,7 +12,7 @@
 import type { CredentialField, PlatformCapability } from "./types";
 
 /** The canonical ordered list of supported platform ids. */
-export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky"] as const;
+export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky", "facebook"] as const;
 
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 
@@ -105,6 +105,25 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
       videoSupported: false,
       multiImage: true,
       maxMediaCount: 4,
+      titleRequired: false,
+      privacyDisclosureApplies: false,
+    },
+  },
+  facebook: {
+    id: "facebook",
+    displayName: "Facebook",
+    icon: "facebook",
+    description: "Post to your Facebook Pages",
+    authKind: "oauth",
+    capability: {
+      // Facebook's post body limit is generous; images are optional (text/link
+      // posts are fine). No video for now (videoSupported: false).
+      maxCaptionLength: 63206,
+      mediaRequired: false,
+      videoRequired: false,
+      videoSupported: false,
+      multiImage: true,
+      maxMediaCount: 10,
       titleRequired: false,
       privacyDisclosureApplies: false,
     },
