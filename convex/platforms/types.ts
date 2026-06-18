@@ -17,6 +17,8 @@ export type PlatformCapability = {
   mediaRequired: boolean;
   /** Whether the media must be a video. */
   videoRequired: boolean;
+  /** Whether video is accepted at all. Undefined = accepted (the v1 default). */
+  videoSupported?: boolean;
   /** Maximum video duration in seconds, when the Platform accepts video. */
   maxVideoDurationSec?: number;
   /** Allowed aspect ratios (e.g. "1:1", "9:16"); undefined = unrestricted. */
@@ -77,8 +79,10 @@ export type ExchangeArgs = {
   callbackUrl: string;
 };
 
-/** OAuth half of an adapter. */
+/** Redirect-OAuth authentication (LinkedIn, Instagram, X). */
 export type OAuthAdapter = {
+  /** Discriminant: this Platform connects via a redirect OAuth flow. */
+  kind: "oauth";
   /** Whether this Platform's authorization flow uses PKCE. */
   usesPKCE?: boolean;
   /** Build the authorization URL the user is redirected to. */
@@ -88,6 +92,46 @@ export type OAuthAdapter = {
   /** Refresh an access token. Throws if the Platform does not support it. */
   refreshToken: (refreshToken: string) => Promise<RefreshResult>;
 };
+
+/** One credential field the connect UI should prompt for. */
+export type CredentialField = {
+  /** Key the value is submitted under (e.g. "identifier", "appPassword"). */
+  name: string;
+  /** Human-facing label shown in the connect form. */
+  label: string;
+  /** Input type — `password` masks the value. */
+  type: "text" | "password";
+  /** Optional placeholder/hint shown in the field. */
+  placeholder?: string;
+};
+
+export type CredentialConnectArgs = {
+  /** The submitted credential values, keyed by `CredentialField.name`. */
+  credentials: Record<string, string>;
+};
+
+/**
+ * Credential authentication (Bluesky / AT Protocol app passwords). There is no
+ * redirect: the user submits credentials directly and the adapter exchanges
+ * them for tokens + account identity in one call.
+ */
+export type CredentialsAdapter = {
+  /** Discriminant: this Platform connects via submitted credentials. */
+  kind: "credentials";
+  /** Fields the connect UI prompts for. */
+  fields: CredentialField[];
+  /** Exchange submitted credentials for tokens + account identity. */
+  connect: (args: CredentialConnectArgs) => Promise<TokenResult>;
+  /** Refresh an access token. Throws if the Platform does not support it. */
+  refreshToken: (refreshToken: string) => Promise<RefreshResult>;
+};
+
+/**
+ * The authentication half of an adapter — a Platform connects either via a
+ * redirect OAuth flow or via submitted credentials. Both expose `refreshToken`
+ * so token refresh stays uniform across the registry (ADR 0006).
+ */
+export type AuthAdapter = OAuthAdapter | CredentialsAdapter;
 
 /** A single Platform, defined in one module. */
 export type PlatformAdapter = {
@@ -100,6 +144,6 @@ export type PlatformAdapter = {
   /** Short tagline shown beside the platform in the connect UI. */
   description: string;
   capability: PlatformCapability;
-  oauth: OAuthAdapter;
+  auth: AuthAdapter;
   publish: (payload: PublishPayload) => Promise<PublishResult>;
 };

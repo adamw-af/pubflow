@@ -33,6 +33,7 @@ import {
   type PlatformId,
 } from "../../../convex/platforms/metadata";
 import { platformIcon } from "~/lib/platform-icons";
+import { CredentialConnectDialog } from "~/components/connect/CredentialConnectDialog";
 
 // Common IANA timezones grouped for readability
 const TIMEZONES = [
@@ -205,9 +206,22 @@ export default function SettingsPage() {
 
           {/* Connect buttons */}
           <div className="flex flex-wrap gap-2">
-            {platformMetadata.map(({ id, displayName, icon }) => {
+            {platformMetadata.map((platform) => {
+              const { id, displayName, icon } = platform;
               const isConnected = connectedPlatforms.has(id);
               const isConnecting = connectingPlatform === id;
+
+              if (platform.authKind === "credentials") {
+                return (
+                  <CredentialConnectDialog
+                    key={id}
+                    platform={platform}
+                    isConnected={isConnected}
+                    disabled={!!connectingPlatform}
+                  />
+                );
+              }
+
               return (
                 <Button
                   key={id}

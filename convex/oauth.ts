@@ -53,11 +53,14 @@ export const beginOAuthFlow = action({
     if (!workspace) throw new Error("Workspace not found");
 
     const adapter = getAdapter(platform);
+    if (adapter.auth.kind !== "oauth") {
+      throw new Error(`${platform} does not use the OAuth redirect flow`);
+    }
     const state = randomState();
     let codeVerifier: string | undefined;
     let codeChallenge: string | undefined;
 
-    if (adapter.oauth.usesPKCE) {
+    if (adapter.auth.usesPKCE) {
       const pkce = await generatePKCE();
       codeVerifier = pkce.verifier;
       codeChallenge = pkce.challenge;
@@ -72,10 +75,55 @@ export const beginOAuthFlow = action({
       codeVerifier,
     });
 
-    return adapter.oauth.authUrl({
+    return adapter.auth.authUrl({
       state,
       callbackUrl: callbackUrlFor(platform),
       codeChallenge,
+    });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Public action — connect a credential-auth Platform (e.g. Bluesky)
+//
+// Credential platforms have no redirect dance: the user submits credentials
+// (handle + app password for Bluesky) and we exchange them for a session in one
+// call, then store the account exactly like the OAuth callback does.
+// ---------------------------------------------------------------------------
+
+export const connectWithCredentials = action({
+  args: {
+    platform: platformValidator,
+    credentials: v.record(v.string(), v.string()),
+  },
+  handler: async (ctx, { platform, credentials }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const workspace = await ctx.runQuery(internal.oauth.getWorkspaceForUser, {
+      tokenIdentifier: identity.subject,
+    });
+    if (!workspace) throw new Error("Workspace not found");
+
+    const adapter = getAdapter(platform);
+    if (adapter.auth.kind !== "credentials") {
+      throw new Error(`${platform} connects via the OAuth redirect flow, not credentials`);
+    }
+
+    const { platformAccountId, platformUsername, accessToken, refreshToken, tokenExpiresAt } =
+      await adapter.auth.connect({ credentials });
+
+    const encryptedAccessToken = await encryptToken(accessToken);
+    const encryptedRefreshToken = refreshToken ? await encryptToken(refreshToken) : undefined;
+
+    await ctx.runMutation(internal.oauth.upsertSocialAccount, {
+      workspaceId: workspace._id,
+      platform,
+      platformAccountId,
+      platformUsername,
+      encryptedAccessToken,
+      encryptedRefreshToken,
+      tokenExpiresAt,
     });
   },
 });
@@ -111,8 +159,12 @@ export const oauthCallback = httpAction(async (ctx, request) => {
   }
 
   try {
+    const adapter = getAdapter(platform);
+    if (adapter.auth.kind !== "oauth") {
+      return failureRedirect("unsupported_flow");
+    }
     const { platformAccountId, platformUsername, accessToken, refreshToken, tokenExpiresAt } =
-      await getAdapter(platform).oauth.exchangeCode({
+      await adapter.auth.exchangeCode({
         code,
         codeVerifier: oauthState.codeVerifier,
         callbackUrl: callbackUrlFor(platform),

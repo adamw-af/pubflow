@@ -3,6 +3,7 @@ import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { platformValidator } from "./platforms/registry";
 
 const DAILY_LIMIT = 50;
 
@@ -10,11 +11,12 @@ const PLATFORM_GUIDELINES: Record<string, string> = {
   linkedin: "Professional, thought-leadership tone. Up to 3000 chars. Paragraphs work well. 2-3 relevant hashtags max.",
   instagram: "Engaging, conversational, can use emojis. Up to 2200 chars. Relevant hashtags encouraged (5-15).",
   x: "Concise and punchy. Hard limit: 280 chars total. 1-2 hashtags max. Every word must earn its place.",
+  bluesky: "Conversational and authentic, light on hashtags. Hard limit: 300 chars total. Plain links are fine.",
 };
 
 export const generateCaption = action({
   args: {
-    platform: v.union(v.literal("linkedin"), v.literal("instagram"), v.literal("x")),
+    platform: platformValidator,
     prompt: v.string(),
     existingCaption: v.optional(v.string()),
   },

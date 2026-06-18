@@ -251,6 +251,6 @@ async function refreshToken(refreshToken: string): Promise<RefreshResult> {
 
 export const instagramAdapter: PlatformAdapter = {
   ...PLATFORM_METADATA.instagram,
-  oauth: { authUrl, exchangeCode, refreshToken },
+  auth: { kind: "oauth", authUrl, exchangeCode, refreshToken },
   publish,
 };

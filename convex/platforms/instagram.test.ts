@@ -60,9 +60,10 @@ describe("instagramAdapter.publish", () => {
   });
 });
 
-describe("instagramAdapter.oauth.authUrl", () => {
+describe("instagramAdapter.auth.authUrl", () => {
   it("requests the content-publish scope", () => {
-    const url = instagramAdapter.oauth.authUrl({
+    if (instagramAdapter.auth.kind !== "oauth") throw new Error("expected oauth adapter");
+    const url = instagramAdapter.auth.authUrl({
       state: "st4te",
       callbackUrl: "https://app.example/oauth/callback/instagram",
     });

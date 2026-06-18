@@ -75,4 +75,20 @@ describe("validateAgainstCapability", () => {
     );
     expect(errors).toEqual([]);
   });
+
+  it("flags a video when the Platform does not support video (Bluesky)", () => {
+    const errors = validateAgainstCapability(
+      { ...baseCapability, videoSupported: false },
+      { caption: "no video here please", media: [{ isVideo: true }] }
+    );
+    expect(errors.map((e) => e.code)).toContain("video_not_supported");
+  });
+
+  it("accepts images on a Platform that does not support video", () => {
+    const errors = validateAgainstCapability(
+      { ...baseCapability, videoSupported: false },
+      { caption: "just a picture", media: [{ isVideo: false }] }
+    );
+    expect(errors).toEqual([]);
+  });
 });

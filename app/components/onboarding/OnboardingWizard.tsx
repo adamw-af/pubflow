@@ -15,6 +15,7 @@ import {
 import { Loader2, CheckCircle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { platformMetadata, type PlatformId } from "../../../convex/platforms/metadata";
+import { CredentialConnectDialog } from "~/components/connect/CredentialConnectDialog";
 import { platformIcon } from "~/lib/platform-icons";
 
 const TIMEZONES = [
@@ -225,12 +226,15 @@ export function OnboardingWizard() {
                   );
                   const isConnecting = connectingPlatform === platform.id;
 
-                  return (
+                  const tile = (
                     <button
-                      key={platform.id}
                       disabled={isConnecting || !!connectingPlatform}
-                      onClick={() => !connected && handleConnect(platform.id)}
-                      className={`flex items-center gap-4 rounded-lg border px-4 py-3 text-left transition-colors ${
+                      onClick={
+                        platform.authKind === "credentials"
+                          ? undefined
+                          : () => !connected && handleConnect(platform.id)
+                      }
+                      className={`flex items-center gap-4 rounded-lg border px-4 py-3 text-left transition-colors w-full ${
                         connected
                           ? "border-primary bg-primary/5 cursor-default"
                           : "hover:bg-muted cursor-pointer"
@@ -256,6 +260,20 @@ export function OnboardingWizard() {
                       )}
                     </button>
                   );
+
+                  if (platform.authKind === "credentials" && !connected) {
+                    return (
+                      <CredentialConnectDialog
+                        key={platform.id}
+                        platform={platform}
+                        isConnected={connected}
+                        disabled={!!connectingPlatform}
+                        trigger={tile}
+                      />
+                    );
+                  }
+
+                  return <div key={platform.id}>{tile}</div>;
                 })}
               </div>
 
