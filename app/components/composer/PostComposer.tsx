@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -374,11 +375,11 @@ export function PostComposer() {
               />
             </PopoverContent>
           </Popover>
-          <input
+          <Input
             type="time"
             value={scheduleTime}
             onChange={(e) => setScheduleTime(e.target.value)}
-            className="rounded-md border px-3 py-2 text-sm bg-background"
+            className="w-auto"
           />
           {timezone !== "UTC" && (
             <span className="text-xs text-muted-foreground">{timezone}</span>
