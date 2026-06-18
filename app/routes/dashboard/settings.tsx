@@ -69,6 +69,7 @@ function platformLabel(id: string): string {
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const workspace = useQuery(api.workspaces.getMyWorkspace);
+  const access = useQuery(api.subscriptions.getWorkspaceAccess, {});
   const accounts = useQuery(api.socialAccounts.listForCurrentWorkspace) ?? [];
   const updateWorkspace = useMutation(api.workspaces.updateWorkspace);
   const disconnectAccount = useMutation(api.socialAccounts.disconnectSocialAccount);
@@ -150,6 +151,11 @@ export default function SettingsPage() {
     accounts.filter((a) => a.status === "active").map((a) => a.platform)
   );
 
+  // The server enforces the limit (computeWorkspaceAccess); mirror it in the UI
+  // so connect buttons disable and explain why before a failed attempt.
+  const canConnectAnother = access?.canConnectAnotherAccount ?? true;
+  const atLimit = access !== undefined && access !== null && !canConnectAnother;
+
   return (
     <div className="flex flex-col gap-6 py-6 px-4 lg:px-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">Settings</h1>
@@ -204,6 +210,23 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Free-limit notice — one connected account on Trial (US#30) */}
+          {atLimit && (
+            <div className="rounded-lg border border-dashed bg-muted/50 px-4 py-3 text-sm">
+              <p className="font-medium">
+                {access?.reason === "trial_expired"
+                  ? "Your trial has ended."
+                  : "You've reached your trial's free limit of one connected account."}
+              </p>
+              <p className="text-muted-foreground">
+                <a href="/pricing" className="text-primary underline underline-offset-4">
+                  Subscribe
+                </a>{" "}
+                to connect more accounts.
+              </p>
+            </div>
+          )}
+
           {/* Connect buttons */}
           <div className="flex flex-wrap gap-2">
             {platformMetadata.map((platform) => {
@@ -217,7 +240,7 @@ export default function SettingsPage() {
                     key={id}
                     platform={platform}
                     isConnected={isConnected}
-                    disabled={!!connectingPlatform}
+                    disabled={!!connectingPlatform || atLimit}
                   />
                 );
               }
@@ -227,7 +250,7 @@ export default function SettingsPage() {
                   key={id}
                   variant={isConnected ? "outline" : "default"}
                   size="sm"
-                  disabled={isConnecting || !!connectingPlatform}
+                  disabled={isConnecting || !!connectingPlatform || atLimit}
                   onClick={() => handleConnect(id)}
                 >
                   {isConnecting ? (

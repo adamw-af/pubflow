@@ -19,6 +19,11 @@ export default defineSchema({
     tier: v.union(v.literal("base"), v.literal("pro"), v.literal("premium")),
     // IANA timezone string e.g. "Europe/London", "America/New_York"
     timezone: v.string(),
+    // When the value-first Trial ends (set at createWorkspace to now + 7 days).
+    // Access state is derived from this + the Subscription — no separate status
+    // enum. Optional for back-compat: rows created before Trials existed have no
+    // value and are treated as an already-expired Trial by getWorkspaceAccess.
+    trialEndsAt: v.optional(v.number()),
     onboardingCompletedAt: v.optional(v.number()),
     emailNotifications: v.optional(v.object({
       publicationFailed: v.boolean(),

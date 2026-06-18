@@ -17,6 +17,9 @@ async function seedWorkspace(t: ReturnType<typeof convexTest>) {
       ownerTokenIdentifier: IDENTITY.subject,
       tier: "base",
       timezone: "UTC",
+      // On Trial — connecting the first Social Account is allowed (the access
+      // gate now blocks connects for expired Workspaces; see computeWorkspaceAccess).
+      trialEndsAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
     });
     await ctx.db.insert("users", {
       tokenIdentifier: IDENTITY.subject,
@@ -85,6 +88,16 @@ describe("oauthCallback — Facebook maps one grant to many Pages", () => {
     process.env.FACEBOOK_APP_SECRET = "app-secret";
     const t = convexTest(schema, modules);
     const workspaceId = await seedWorkspace(t);
+
+    // One Facebook grant maps to multiple Pages (two here), which exceeds the
+    // 1-account Trial free limit. Give this Workspace an active Subscription so
+    // the paid tier cap applies and this test isolates Page-mapping, not billing.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        workspaceId: workspaceId as Id<"workspaces">,
+        status: "active",
+      });
+    });
 
     // Seed a valid OAuth state for the facebook flow.
     await t.run(async (ctx) => {

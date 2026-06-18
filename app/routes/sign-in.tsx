@@ -1,9 +1,11 @@
 import { SignIn } from "@clerk/react-router";
+import { AuthLayout } from "~/components/auth/AuthLayout";
+import { clerkAppearance } from "~/lib/clerk-appearance";
 
 export default function SignInPage() {
   return (
-    <div className="flex items-center justify-center h-screen">
-      <SignIn />
-    </div>
+    <AuthLayout>
+      <SignIn appearance={clerkAppearance} signUpUrl="/sign-up" />
+    </AuthLayout>
   );
 }
