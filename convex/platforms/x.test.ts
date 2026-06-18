@@ -46,9 +46,10 @@ describe("xAdapter.publish", () => {
   });
 });
 
-describe("xAdapter.oauth.authUrl", () => {
+describe("xAdapter.auth.authUrl", () => {
   it("includes the PKCE code challenge and S256 method", () => {
-    const url = xAdapter.oauth.authUrl({
+    if (xAdapter.auth.kind !== "oauth") throw new Error("expected oauth adapter");
+    const url = xAdapter.auth.authUrl({
       state: "st4te",
       callbackUrl: "https://app.example/oauth/callback/x",
       codeChallenge: "chal",
@@ -61,6 +62,8 @@ describe("xAdapter.oauth.authUrl", () => {
   });
 
   it("declares that it uses PKCE", () => {
-    expect(xAdapter.oauth.usesPKCE).toBe(true);
+    expect(xAdapter.auth.kind).toBe("oauth");
+    if (xAdapter.auth.kind !== "oauth") return;
+    expect(xAdapter.auth.usesPKCE).toBe(true);
   });
 });

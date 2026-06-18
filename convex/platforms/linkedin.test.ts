@@ -69,9 +69,10 @@ describe("linkedinAdapter.publish", () => {
   });
 });
 
-describe("linkedinAdapter.oauth.authUrl", () => {
+describe("linkedinAdapter.auth.authUrl", () => {
   it("builds the LinkedIn authorization URL with client id, scope and redirect", () => {
-    const url = linkedinAdapter.oauth.authUrl({
+    if (linkedinAdapter.auth.kind !== "oauth") throw new Error("expected oauth adapter");
+    const url = linkedinAdapter.auth.authUrl({
       state: "st4te",
       callbackUrl: "https://app.example/oauth/callback/linkedin",
     });

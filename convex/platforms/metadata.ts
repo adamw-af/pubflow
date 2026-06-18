@@ -9,10 +9,10 @@
 // in `PLATFORM_METADATA` (plus its adapter module) — no scattered UI edits.
 // ---------------------------------------------------------------------------
 
-import type { PlatformCapability } from "./types";
+import type { CredentialField, PlatformCapability } from "./types";
 
 /** The canonical ordered list of supported platform ids. */
-export const PLATFORM_IDS = ["linkedin", "instagram", "x"] as const;
+export const PLATFORM_IDS = ["linkedin", "instagram", "x", "bluesky"] as const;
 
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 
@@ -25,6 +25,13 @@ export type PlatformMetadata = {
   /** Short tagline shown beside the platform in the connect UI. */
   description: string;
   capability: PlatformCapability;
+  /**
+   * How the connect UI should authenticate this Platform: `"oauth"` redirects
+   * to the Platform; `"credentials"` shows a form built from `credentialFields`.
+   */
+  authKind: "oauth" | "credentials";
+  /** Fields the connect form prompts for (credentials platforms only). */
+  credentialFields?: CredentialField[];
 };
 
 export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
@@ -33,6 +40,7 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
     displayName: "LinkedIn",
     icon: "linkedin",
     description: "Share professional content",
+    authKind: "oauth",
     capability: {
       maxCaptionLength: 3000,
       mediaRequired: false,
@@ -48,6 +56,7 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
     displayName: "Instagram",
     icon: "instagram",
     description: "Photos, reels, and stories",
+    authKind: "oauth",
     capability: {
       maxCaptionLength: 2200,
       mediaRequired: true,
@@ -63,10 +72,37 @@ export const PLATFORM_METADATA: Record<PlatformId, PlatformMetadata> = {
     displayName: "X (Twitter)",
     icon: "x",
     description: "Short-form updates",
+    authKind: "oauth",
     capability: {
       maxCaptionLength: 280,
       mediaRequired: false,
       videoRequired: false,
+      multiImage: true,
+      maxMediaCount: 4,
+      titleRequired: false,
+      privacyDisclosureApplies: false,
+    },
+  },
+  bluesky: {
+    id: "bluesky",
+    displayName: "Bluesky",
+    icon: "bluesky",
+    description: "Open social on AT Protocol",
+    authKind: "credentials",
+    credentialFields: [
+      { name: "identifier", label: "Handle", type: "text", placeholder: "you.bsky.social" },
+      {
+        name: "appPassword",
+        label: "App password",
+        type: "password",
+        placeholder: "xxxx-xxxx-xxxx-xxxx",
+      },
+    ],
+    capability: {
+      maxCaptionLength: 300,
+      mediaRequired: false,
+      videoRequired: false,
+      videoSupported: false,
       multiImage: true,
       maxMediaCount: 4,
       titleRequired: false,

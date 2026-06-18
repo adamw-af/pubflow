@@ -2,12 +2,16 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { decryptToken } from "./lib/encryption";
+import { decryptToken, encryptToken } from "./lib/encryption";
 import { getNextOccurrence } from "./lib/recurrence";
 import { getAdapter } from "./platforms/registry";
 
 const MAX_BATCH = 50;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL ?? "";
+// Refresh a token at publish time if it expires within this window. Covers
+// short-lived tokens (e.g. Bluesky's ~2h access JWT) that the daily refresh
+// cron cannot keep alive for Posts scheduled further out.
+const PUBLISH_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Main action — called by the cron every minute
@@ -33,7 +37,7 @@ export const processScheduledPublications = internalAction({
 
         const { variant, socialAccount } = data;
 
-        const accessToken = await decryptToken(socialAccount.encryptedAccessToken);
+        const accessToken = await ensureFreshAccessToken(ctx, socialAccount);
 
         const mediaUrls = data.mediaKeys.map(
           (key: string) => `${R2_PUBLIC_URL}/${key}`
@@ -89,6 +93,48 @@ export const processScheduledPublications = internalAction({
     }
   },
 });
+
+// ---------------------------------------------------------------------------
+// Just-in-time token refresh
+//
+// A scheduled Publication may fire long after its Social Account's access token
+// was minted. For Platforms with short-lived tokens this would fail; so if the
+// token is expired (or about to be) and a refresh token exists, refresh via the
+// adapter and persist the rotated tokens before publishing.
+// ---------------------------------------------------------------------------
+
+async function ensureFreshAccessToken(
+  ctx: any,
+  socialAccount: {
+    _id: Id<"socialAccounts">;
+    platform: string;
+    encryptedAccessToken: string;
+    encryptedRefreshToken?: string;
+    tokenExpiresAt?: number;
+  }
+): Promise<string> {
+  const expiringSoon =
+    socialAccount.tokenExpiresAt !== undefined &&
+    socialAccount.tokenExpiresAt <= Date.now() + PUBLISH_REFRESH_BUFFER_MS;
+
+  if (!expiringSoon || !socialAccount.encryptedRefreshToken) {
+    return decryptToken(socialAccount.encryptedAccessToken);
+  }
+
+  const refreshToken = await decryptToken(socialAccount.encryptedRefreshToken);
+  const refreshed = await getAdapter(socialAccount.platform).auth.refreshToken(refreshToken);
+
+  await ctx.runMutation(internal.tokenRefresh.storeRefreshedToken, {
+    id: socialAccount._id,
+    encryptedAccessToken: await encryptToken(refreshed.accessToken),
+    encryptedRefreshToken: refreshed.refreshToken
+      ? await encryptToken(refreshed.refreshToken)
+      : socialAccount.encryptedRefreshToken,
+    tokenExpiresAt: refreshed.expiresAt,
+  });
+
+  return refreshed.accessToken;
+}
 
 // ---------------------------------------------------------------------------
 // Internal mutations

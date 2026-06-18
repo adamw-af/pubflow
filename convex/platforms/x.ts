@@ -182,6 +182,6 @@ async function refreshToken(refreshToken: string): Promise<RefreshResult> {
 
 export const xAdapter: PlatformAdapter = {
   ...PLATFORM_METADATA.x,
-  oauth: { usesPKCE: true, authUrl, exchangeCode, refreshToken },
+  auth: { kind: "oauth", usesPKCE: true, authUrl, exchangeCode, refreshToken },
   publish,
 };

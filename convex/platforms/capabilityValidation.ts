@@ -56,6 +56,13 @@ export function validateAgainstCapability(
     });
   }
 
+  if (capability.videoSupported === false && variant.media.some((m) => m.isVideo)) {
+    errors.push({
+      code: "video_not_supported",
+      message: "This platform does not support video.",
+    });
+  }
+
   if (variant.media.length > capability.maxMediaCount) {
     errors.push({
       code: "too_many_media",

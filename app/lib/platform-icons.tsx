@@ -9,6 +9,7 @@ const ICONS: Record<string, (className: string) => ReactNode> = {
   linkedin: (className) => <Linkedin className={className} />,
   instagram: (className) => <Instagram className={className} />,
   x: () => <span className="font-bold leading-none">𝕏</span>,
+  bluesky: () => <span className="leading-none">🦋</span>,
 };
 
 /** Render a platform's icon from its registry `icon` key. */

@@ -197,6 +197,6 @@ async function refreshToken(refreshToken: string): Promise<RefreshResult> {
 
 export const linkedinAdapter: PlatformAdapter = {
   ...PLATFORM_METADATA.linkedin,
-  oauth: { authUrl, exchangeCode, refreshToken },
+  auth: { kind: "oauth", authUrl, exchangeCode, refreshToken },
   publish,
 };

@@ -21,7 +21,7 @@ export const refreshExpiringTokens = internalAction({
 
       try {
         const refreshToken = await decryptToken(account.encryptedRefreshToken);
-        const result = await getAdapter(account.platform).oauth.refreshToken(refreshToken);
+        const result = await getAdapter(account.platform).auth.refreshToken(refreshToken);
 
         const encryptedAccessToken = await encryptToken(result.accessToken);
         const encryptedRefreshToken = result.refreshToken
