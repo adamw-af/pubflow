@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { platformValidator } from "./platforms/registry";
 
 export default defineSchema({
   users: defineTable({
@@ -75,11 +76,7 @@ export default defineSchema({
 
   socialAccounts: defineTable({
     workspaceId: v.id("workspaces"),
-    platform: v.union(
-      v.literal("linkedin"),
-      v.literal("instagram"),
-      v.literal("x")
-    ),
+    platform: platformValidator,
     platformAccountId: v.string(),
     platformUsername: v.string(),
     encryptedAccessToken: v.string(),
@@ -187,9 +184,9 @@ export default defineSchema({
     state: v.string(),
     workspaceId: v.id("workspaces"),
     userTokenIdentifier: v.string(),
-    platform: v.union(v.literal("linkedin"), v.literal("instagram"), v.literal("x")),
+    platform: platformValidator,
     expiresAt: v.number(),
-    codeVerifier: v.optional(v.string()), // X PKCE only
+    codeVerifier: v.optional(v.string()), // PKCE platforms only (e.g. X)
   }).index("by_state", ["state"]),
 
   hashtagSets: defineTable({

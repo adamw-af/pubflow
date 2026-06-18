@@ -4,7 +4,7 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import { internal } from "./_generated/api";
 import { decryptToken } from "./lib/encryption";
 import { getNextOccurrence } from "./lib/recurrence";
-import { publishToplatform } from "./publishing/index";
+import { getAdapter } from "./platforms/registry";
 
 const MAX_BATCH = 50;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL ?? "";
@@ -39,7 +39,7 @@ export const processScheduledPublications = internalAction({
           (key: string) => `${R2_PUBLIC_URL}/${key}`
         );
 
-        const publishResult = await publishToplatform(socialAccount.platform, {
+        const publishResult = await getAdapter(socialAccount.platform).publish({
           accessToken,
           caption: variant.caption ?? "",
           mediaUrls,

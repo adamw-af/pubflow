@@ -2,6 +2,7 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { encryptToken, decryptToken } from "./lib/encryption";
+import { getAdapter } from "./platforms/registry";
 
 const REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days before expiry
 
@@ -20,7 +21,7 @@ export const refreshExpiringTokens = internalAction({
 
       try {
         const refreshToken = await decryptToken(account.encryptedRefreshToken);
-        const result = await refreshPlatformToken(account.platform, refreshToken);
+        const result = await getAdapter(account.platform).oauth.refreshToken(refreshToken);
 
         const encryptedAccessToken = await encryptToken(result.accessToken);
         const encryptedRefreshToken = result.refreshToken
@@ -40,88 +41,6 @@ export const refreshExpiringTokens = internalAction({
     }
   },
 });
-
-// ---------------------------------------------------------------------------
-// Platform-specific refresh
-// ---------------------------------------------------------------------------
-
-type RefreshResult = {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
-};
-
-async function refreshPlatformToken(
-  platform: "linkedin" | "instagram" | "x",
-  refreshToken: string
-): Promise<RefreshResult> {
-  switch (platform) {
-    case "linkedin":
-      return refreshLinkedIn(refreshToken);
-    case "x":
-      return refreshX(refreshToken);
-    case "instagram":
-      return refreshInstagram(refreshToken);
-  }
-}
-
-async function refreshLinkedIn(refreshToken: string): Promise<RefreshResult> {
-  const res = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: process.env.LINKEDIN_CLIENT_ID!,
-      client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
-    }),
-  });
-  if (!res.ok) throw new Error(`LinkedIn refresh failed: ${await res.text()}`);
-  const data = await res.json();
-  return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt: data.expires_in ? Date.now() + data.expires_in * 1000 : undefined,
-  };
-}
-
-async function refreshX(refreshToken: string): Promise<RefreshResult> {
-  const credentials = btoa(`${process.env.X_CLIENT_ID}:${process.env.X_CLIENT_SECRET}`);
-  const res = await fetch("https://api.twitter.com/2/oauth2/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${credentials}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
-  if (!res.ok) throw new Error(`X refresh failed: ${await res.text()}`);
-  const data = await res.json();
-  return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt: data.expires_in ? Date.now() + data.expires_in * 1000 : undefined,
-  };
-}
-
-async function refreshInstagram(refreshToken: string): Promise<RefreshResult> {
-  const res = await fetch(
-    `https://graph.instagram.com/refresh_access_token?` +
-      new URLSearchParams({
-        grant_type: "ig_refresh_token",
-        access_token: refreshToken,
-      })
-  );
-  if (!res.ok) throw new Error(`Instagram refresh failed: ${await res.text()}`);
-  const data = await res.json();
-  return {
-    accessToken: data.access_token,
-    expiresAt: data.expires_in ? Date.now() + data.expires_in * 1000 : undefined,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Internal queries / mutations
