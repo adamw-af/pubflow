@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { CharacterCounter, PLATFORM_LIMITS } from "./CharacterCounter";
+import { getPlatformMetadata, type PlatformId } from "../../../convex/platforms/metadata";
 import { MediaPicker } from "~/components/media/MediaPicker";
 import { cn } from "~/lib/utils";
 import { Sparkles, Hash, AlertTriangle } from "lucide-react";
@@ -24,7 +25,7 @@ interface HashtagSet {
 }
 
 interface VariantEditorProps {
-  platform: "linkedin" | "instagram" | "x";
+  platform: PlatformId;
   accountUsername: string;
   caption: string;
   mediaItemIds: Id<"mediaItems">[];
@@ -142,7 +143,7 @@ export function VariantEditor({
       <MediaPicker
         selectedIds={mediaItemIds}
         onChange={onMediaChange}
-        maxItems={platform === "x" ? 4 : 10}
+        maxItems={getPlatformMetadata(platform).capability.maxMediaCount}
       />
 
       {showAiInput && (

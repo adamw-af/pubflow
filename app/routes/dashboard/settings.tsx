@@ -25,8 +25,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Linkedin, Instagram, Loader2, Trash2, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Trash2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  platformMetadata,
+  PLATFORM_METADATA,
+  type PlatformId,
+} from "../../../convex/platforms/metadata";
+import { platformIcon } from "~/lib/platform-icons";
 
 // Common IANA timezones grouped for readability
 const TIMEZONES = [
@@ -54,17 +60,10 @@ const TIMEZONES = [
   { value: "Pacific/Auckland", label: "Auckland (NZST/NZDT)" },
 ];
 
-const PLATFORM_LABELS: Record<string, string> = {
-  linkedin: "LinkedIn",
-  instagram: "Instagram",
-  x: "X (Twitter)",
-};
-
-const PLATFORM_ICONS: Record<string, React.ReactNode> = {
-  linkedin: <Linkedin className="size-4" />,
-  instagram: <Instagram className="size-4" />,
-  x: <span className="font-bold text-sm">𝕏</span>,
-};
+/** Display name for a platform id from the registry, tolerant of unknown ids. */
+function platformLabel(id: string): string {
+  return PLATFORM_METADATA[id as PlatformId]?.displayName ?? id;
+}
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -95,7 +94,7 @@ export default function SettingsPage() {
     const oauthError = searchParams.get("oauth_error");
 
     if (connected) {
-      toast.success(`${PLATFORM_LABELS[connected] ?? connected} connected successfully`);
+      toast.success(`${platformLabel(connected)} connected successfully`);
       setSearchParams({}, { replace: true });
     }
     if (oauthError) {
@@ -126,7 +125,7 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleConnect(platform: "linkedin" | "instagram" | "x") {
+  async function handleConnect(platform: PlatformId) {
     setConnectingPlatform(platform);
     try {
       const url = await beginOAuth({ platform });
@@ -173,12 +172,12 @@ export default function SettingsPage() {
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-muted-foreground">
-                      {PLATFORM_ICONS[account.platform]}
+                      {platformIcon(PLATFORM_METADATA[account.platform]?.icon ?? account.platform)}
                     </span>
                     <div>
                       <p className="text-sm font-medium">@{account.platformUsername}</p>
                       <p className="text-xs text-muted-foreground">
-                        {PLATFORM_LABELS[account.platform]}
+                        {platformLabel(account.platform)}
                       </p>
                     </div>
                   </div>
@@ -206,25 +205,25 @@ export default function SettingsPage() {
 
           {/* Connect buttons */}
           <div className="flex flex-wrap gap-2">
-            {(["linkedin", "instagram", "x"] as const).map((platform) => {
-              const isConnected = connectedPlatforms.has(platform);
-              const isConnecting = connectingPlatform === platform;
+            {platformMetadata.map(({ id, displayName, icon }) => {
+              const isConnected = connectedPlatforms.has(id);
+              const isConnecting = connectingPlatform === id;
               return (
                 <Button
-                  key={platform}
+                  key={id}
                   variant={isConnected ? "outline" : "default"}
                   size="sm"
                   disabled={isConnecting || !!connectingPlatform}
-                  onClick={() => handleConnect(platform)}
+                  onClick={() => handleConnect(id)}
                 >
                   {isConnecting ? (
                     <Loader2 className="size-4 mr-2 animate-spin" />
                   ) : (
-                    <span className="mr-2">{PLATFORM_ICONS[platform]}</span>
+                    <span className="mr-2">{platformIcon(icon)}</span>
                   )}
                   {isConnected
-                    ? `Add another ${PLATFORM_LABELS[platform]}`
-                    : `Connect ${PLATFORM_LABELS[platform]}`}
+                    ? `Add another ${displayName}`
+                    : `Connect ${displayName}`}
                 </Button>
               );
             })}

@@ -3,65 +3,18 @@ import type { Id } from "./_generated/dataModel";
 import { action, httpAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { encryptToken } from "./lib/encryption";
+import { getAdapter, platformValidator, type PlatformId } from "./platforms/registry";
 
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-// ---------------------------------------------------------------------------
-// Platform configs
-// ---------------------------------------------------------------------------
+type Platform = PlatformId;
 
-type Platform = "linkedin" | "instagram" | "x";
-
-function getAuthorizationUrl(
-  platform: Platform,
-  state: string,
-  codeChallenge?: string
-): string {
-  const callbackUrl = `${process.env.CONVEX_SITE_URL}/oauth/callback/${platform}`;
-
-  switch (platform) {
-    case "linkedin":
-      return (
-        `https://www.linkedin.com/oauth/v2/authorization?` +
-        new URLSearchParams({
-          response_type: "code",
-          client_id: process.env.LINKEDIN_CLIENT_ID!,
-          redirect_uri: callbackUrl,
-          state,
-          scope: "w_member_social openid profile email",
-        })
-      );
-
-    case "instagram":
-      return (
-        `https://www.instagram.com/oauth/authorize?` +
-        new URLSearchParams({
-          response_type: "code",
-          client_id: process.env.FACEBOOK_APP_ID!,
-          redirect_uri: callbackUrl,
-          state,
-          scope: "instagram_business_basic,instagram_business_content_publish",
-        })
-      );
-
-    case "x":
-      return (
-        `https://x.com/i/oauth2/authorize?` +
-        new URLSearchParams({
-          response_type: "code",
-          client_id: process.env.X_CLIENT_ID!,
-          redirect_uri: callbackUrl,
-          state,
-          scope: "tweet.read tweet.write users.read offline.access",
-          code_challenge: codeChallenge!,
-          code_challenge_method: "S256",
-        })
-      );
-  }
+function callbackUrlFor(platform: string): string {
+  return `${process.env.CONVEX_SITE_URL}/oauth/callback/${platform}`;
 }
 
 // ---------------------------------------------------------------------------
-// PKCE helpers (X only)
+// PKCE helpers (PKCE platforms only, e.g. X)
 // ---------------------------------------------------------------------------
 
 function bytesToBase64url(bytes: Uint8Array): string {
@@ -88,7 +41,7 @@ function randomState(): string {
 
 export const beginOAuthFlow = action({
   args: {
-    platform: v.union(v.literal("linkedin"), v.literal("instagram"), v.literal("x")),
+    platform: platformValidator,
   },
   handler: async (ctx, { platform }) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -99,11 +52,12 @@ export const beginOAuthFlow = action({
     });
     if (!workspace) throw new Error("Workspace not found");
 
+    const adapter = getAdapter(platform);
     const state = randomState();
     let codeVerifier: string | undefined;
     let codeChallenge: string | undefined;
 
-    if (platform === "x") {
+    if (adapter.oauth.usesPKCE) {
       const pkce = await generatePKCE();
       codeVerifier = pkce.verifier;
       codeChallenge = pkce.challenge;
@@ -118,7 +72,11 @@ export const beginOAuthFlow = action({
       codeVerifier,
     });
 
-    return getAuthorizationUrl(platform, state, codeChallenge);
+    return adapter.oauth.authUrl({
+      state,
+      callbackUrl: callbackUrlFor(platform),
+      codeChallenge,
+    });
   },
 });
 
@@ -154,7 +112,11 @@ export const oauthCallback = httpAction(async (ctx, request) => {
 
   try {
     const { platformAccountId, platformUsername, accessToken, refreshToken, tokenExpiresAt } =
-      await exchangeCodeForTokens(platform, code, oauthState.codeVerifier, request.url);
+      await getAdapter(platform).oauth.exchangeCode({
+        code,
+        codeVerifier: oauthState.codeVerifier,
+        callbackUrl: callbackUrlFor(platform),
+      });
 
     const encryptedAccessToken = await encryptToken(accessToken);
     const encryptedRefreshToken = refreshToken ? await encryptToken(refreshToken) : undefined;
@@ -185,150 +147,6 @@ export const oauthCallback = httpAction(async (ctx, request) => {
 });
 
 // ---------------------------------------------------------------------------
-// Token exchange — platform-specific
-// ---------------------------------------------------------------------------
-
-type TokenResult = {
-  platformAccountId: string;
-  platformUsername: string;
-  accessToken: string;
-  refreshToken?: string;
-  tokenExpiresAt?: number;
-};
-
-async function exchangeCodeForTokens(
-  platform: Platform,
-  code: string,
-  codeVerifier: string | undefined,
-  callbackRequestUrl: string
-): Promise<TokenResult> {
-  switch (platform) {
-    case "linkedin":
-      return exchangeLinkedIn(code, callbackRequestUrl);
-    case "instagram":
-      return exchangeInstagram(code, callbackRequestUrl);
-    case "x":
-      return exchangeX(code, codeVerifier!, callbackRequestUrl);
-  }
-}
-
-async function exchangeLinkedIn(code: string, callbackRequestUrl: string): Promise<TokenResult> {
-  const callbackUrl = buildCallbackUrl(callbackRequestUrl, "linkedin");
-
-  const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: callbackUrl,
-      client_id: process.env.LINKEDIN_CLIENT_ID!,
-      client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
-    }),
-  });
-
-  if (!tokenRes.ok) throw new Error(`LinkedIn token exchange failed: ${await tokenRes.text()}`);
-  const tokens = await tokenRes.json();
-
-  // Fetch LinkedIn user info
-  const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
-    headers: { Authorization: `Bearer ${tokens.access_token}` },
-  });
-  if (!profileRes.ok) throw new Error("Failed to fetch LinkedIn profile");
-  const profile = await profileRes.json();
-
-  return {
-    platformAccountId: profile.sub,
-    platformUsername: profile.name ?? profile.email ?? profile.sub,
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    tokenExpiresAt: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : undefined,
-  };
-}
-
-async function exchangeInstagram(code: string, callbackRequestUrl: string): Promise<TokenResult> {
-  const callbackUrl = buildCallbackUrl(callbackRequestUrl, "instagram");
-
-  // Step 1: Exchange code for short-lived token
-  const shortTokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.FACEBOOK_APP_ID!,
-      client_secret: process.env.FACEBOOK_APP_SECRET!,
-      grant_type: "authorization_code",
-      redirect_uri: callbackUrl,
-      code,
-    }),
-  });
-  if (!shortTokenRes.ok) throw new Error(`Instagram token exchange failed: ${await shortTokenRes.text()}`);
-  const { access_token: shortToken, user_id } = await shortTokenRes.json();
-
-  // Step 2: Exchange for long-lived token (60 days)
-  const longTokenRes = await fetch(
-    `https://graph.instagram.com/access_token?` +
-      new URLSearchParams({
-        grant_type: "ig_exchange_token",
-        client_secret: process.env.FACEBOOK_APP_SECRET!,
-        access_token: shortToken,
-      })
-  );
-  if (!longTokenRes.ok) throw new Error("Failed to exchange for long-lived Instagram token");
-  const { access_token: longToken, expires_in } = await longTokenRes.json();
-
-  // Step 3: Get id and username
-  const userRes = await fetch(
-    `https://graph.instagram.com/me?fields=id,username&access_token=${longToken}`
-  );
-  const igUser = userRes.ok ? await userRes.json() : {};
-
-  return {
-    platformAccountId: igUser.id ?? String(user_id),
-    platformUsername: igUser.username ?? String(user_id),
-    accessToken: longToken,
-    tokenExpiresAt: expires_in ? Date.now() + expires_in * 1000 : undefined,
-  };
-}
-
-async function exchangeX(code: string, codeVerifier: string, callbackRequestUrl: string): Promise<TokenResult> {
-  const callbackUrl = buildCallbackUrl(callbackRequestUrl, "x");
-
-  const credentials = btoa(`${process.env.X_CLIENT_ID}:${process.env.X_CLIENT_SECRET}`);
-
-  const tokenRes = await fetch("https://api.twitter.com/2/oauth2/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${credentials}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: callbackUrl,
-      code_verifier: codeVerifier,
-    }),
-  });
-
-  if (!tokenRes.ok) throw new Error(`X token exchange failed: ${await tokenRes.text()}`);
-  const tokens = await tokenRes.json();
-
-  // Fetch X user info
-  const userRes = await fetch("https://api.twitter.com/2/users/me", {
-    headers: { Authorization: `Bearer ${tokens.access_token}` },
-  });
-  if (!userRes.ok) throw new Error("Failed to fetch X user info");
-  const { data: xUser } = await userRes.json();
-
-  return {
-    platformAccountId: xUser.id,
-    platformUsername: xUser.username,
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    tokenExpiresAt: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : undefined,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Internal mutations / queries
 // ---------------------------------------------------------------------------
 
@@ -349,7 +167,7 @@ export const storeOAuthState = internalMutation({
     state: v.string(),
     workspaceId: v.id("workspaces"),
     userTokenIdentifier: v.string(),
-    platform: v.union(v.literal("linkedin"), v.literal("instagram"), v.literal("x")),
+    platform: platformValidator,
     expiresAt: v.number(),
     codeVerifier: v.optional(v.string()),
   },
@@ -382,7 +200,7 @@ export const deleteOAuthState = internalMutation({
 export const upsertSocialAccount = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    platform: v.union(v.literal("linkedin"), v.literal("instagram"), v.literal("x")),
+    platform: platformValidator,
     platformAccountId: v.string(),
     platformUsername: v.string(),
     encryptedAccessToken: v.string(),
@@ -429,7 +247,7 @@ export const listSocialAccounts = action({
   handler: async (ctx): Promise<Array<{
     _id: Id<"socialAccounts">;
     workspaceId: Id<"workspaces">;
-    platform: "linkedin" | "instagram" | "x";
+    platform: PlatformId;
     platformAccountId: string;
     platformUsername: string;
     tokenExpiresAt?: number;
@@ -461,13 +279,3 @@ export const getSocialAccountsForWorkspace = internalQuery({
     return accounts.map(({ encryptedAccessToken: _, encryptedRefreshToken: __, ...safe }) => safe);
   },
 });
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function buildCallbackUrl(requestUrl: string, platform: Platform): string {
-  // Reconstruct the callback URL from the Convex site URL env var
-  // (requestUrl itself is the callback URL, but we use the env var to be explicit)
-  return `${process.env.CONVEX_SITE_URL}/oauth/callback/${platform}`;
-}

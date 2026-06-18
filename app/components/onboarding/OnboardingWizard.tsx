@@ -12,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Linkedin, Instagram, Loader2, CheckCircle, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { platformMetadata, type PlatformId } from "../../../convex/platforms/metadata";
+import { platformIcon } from "~/lib/platform-icons";
 
 const TIMEZONES = [
   { value: "UTC", label: "UTC" },
@@ -38,27 +40,6 @@ const TIMEZONES = [
   { value: "Australia/Sydney", label: "Sydney (AEST/AEDT)" },
   { value: "Australia/Melbourne", label: "Melbourne (AEST/AEDT)" },
   { value: "Pacific/Auckland", label: "Auckland (NZST/NZDT)" },
-];
-
-const PLATFORMS = [
-  {
-    id: "linkedin" as const,
-    label: "LinkedIn",
-    icon: <Linkedin className="size-5" />,
-    description: "Share professional content",
-  },
-  {
-    id: "instagram" as const,
-    label: "Instagram",
-    icon: <Instagram className="size-5" />,
-    description: "Photos, reels, and stories",
-  },
-  {
-    id: "x" as const,
-    label: "X (Twitter)",
-    icon: <span className="font-bold text-base leading-none">𝕏</span>,
-    description: "Short-form updates",
-  },
 ];
 
 const STEPS = ["Workspace", "Connect", "Ready"];
@@ -109,7 +90,7 @@ export function OnboardingWizard() {
     }
   }
 
-  async function handleConnect(platform: "linkedin" | "instagram" | "x") {
+  async function handleConnect(platform: PlatformId) {
     setConnectingPlatform(platform);
     try {
       const url = await beginOAuth({ platform });
@@ -238,7 +219,7 @@ export function OnboardingWizard() {
               </div>
 
               <div className="flex flex-col gap-3">
-                {PLATFORMS.map((platform) => {
+                {platformMetadata.map((platform) => {
                   const connected = accounts.some(
                     (a) => a.platform === platform.id && a.status === "active"
                   );
@@ -259,11 +240,11 @@ export function OnboardingWizard() {
                         {isConnecting ? (
                           <Loader2 className="size-4 animate-spin" />
                         ) : (
-                          platform.icon
+                          platformIcon(platform.icon, "size-5")
                         )}
                       </span>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{platform.label}</p>
+                        <p className="text-sm font-medium">{platform.displayName}</p>
                         <p className="text-xs text-muted-foreground">
                           {platform.description}
                         </p>

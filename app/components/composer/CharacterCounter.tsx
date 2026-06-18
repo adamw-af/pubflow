@@ -1,8 +1,10 @@
-const PLATFORM_LIMITS: Record<string, number> = {
-  linkedin: 3000,
-  instagram: 2200,
-  x: 280,
-};
+import { PLATFORM_METADATA } from "../../../convex/platforms/metadata";
+
+// Caption limits derive from the registry's per-platform capability, so the
+// composer can never drift from what each adapter actually accepts (ADR 0006).
+const PLATFORM_LIMITS: Record<string, number> = Object.fromEntries(
+  Object.values(PLATFORM_METADATA).map((m) => [m.id, m.capability.maxCaptionLength])
+);
 
 interface CharacterCounterProps {
   platform: string;
