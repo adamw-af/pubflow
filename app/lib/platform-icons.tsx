@@ -19,3 +19,29 @@ const ICONS: Record<string, (className: string) => ReactNode> = {
 export function platformIcon(iconKey: string, className = "size-4"): ReactNode {
   return ICONS[iconKey]?.(className) ?? null;
 }
+
+// Platform ids that have a `--ch-<id>` brand-colour token in `app/app.css`.
+// Kept here next to the icons so the two frontend-only bits of platform config
+// live together — a new platform adds one entry here, one token in the CSS.
+const BRAND_COLOR_IDS = new Set([
+  "linkedin",
+  "instagram",
+  "x",
+  "bluesky",
+  "facebook",
+  "threads",
+  "tiktok",
+  "youtube",
+]);
+
+/**
+ * The brand colour for a Platform, as a CSS value referencing the `--ch-<id>`
+ * token. Falls back to a neutral so an unknown/just-merged platform renders a
+ * muted chip rather than a blank/black one. Use in an inline `style` (the
+ * tokens are runtime CSS variables, not Tailwind classes).
+ */
+export function platformBrandColor(platformId: string): string {
+  return BRAND_COLOR_IDS.has(platformId)
+    ? `var(--ch-${platformId})`
+    : "var(--text-muted)";
+}
