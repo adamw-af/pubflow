@@ -1,7 +1,17 @@
 import { getAuth } from "@clerk/react-router/server";
 import { ConvexHttpClient } from "convex/browser";
 import { ArrowRight, Calendar, Check, Clock, Layers } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  IconBrandBluesky,
+  IconBrandFacebook,
+  IconBrandInstagram,
+  IconBrandLinkedin,
+  IconBrandThreads,
+  IconBrandTiktok,
+  IconBrandX,
+  IconBrandYoutube,
+} from "@tabler/icons-react";
+import type { ComponentType, ReactNode } from "react";
 import { Link, redirect } from "react-router";
 import { SiteFooter, SiteNav } from "~/components/site/site-chrome";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -11,34 +21,26 @@ import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Pub Flow — Schedule once. Post everywhere." },
-    { name: "description", content: "Pub Flow turns the weekly scramble into one calm stream. Write a post, tailor it per channel, and let your whole week publish itself." },
+    { title: "Pub Flow — Social scheduling, finally simple." },
+    { name: "description", content: "The simple way to schedule across every channel. One calm composer, unlimited posts, and 25 connected accounts for $15/mo — honest pricing, no per-seat surprises." },
   ];
 }
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
-  const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL ?? "");
-  const [subscriptionData, plans] = await Promise.all([
-    userId
-      ? convex.query(api.subscriptions.checkUserSubscriptionStatus, { userId }).catch(() => null)
-      : Promise.resolve(null),
-    convex.action(api.subscriptions.getAvailablePlans).catch(() => ({ items: [], pagination: null })),
-  ]);
 
   if (userId) {
+    const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL ?? "");
+    const subscriptionData = await convex
+      .query(api.subscriptions.checkUserSubscriptionStatus, { userId })
+      .catch(() => null);
     if (subscriptionData?.hasActiveSubscription) {
       throw redirect("/dashboard");
-    } else {
-      throw redirect("/subscription-required");
     }
+    throw redirect("/subscription-required");
   }
 
-  return {
-    isSignedIn: false,
-    hasActiveSubscription: false,
-    plans,
-  };
+  return { isSignedIn: false };
 }
 
 /* ------------------------------------------------------------------ */
@@ -60,16 +62,40 @@ const CHANNEL_COLORS: Record<Platform, string> = {
   bluesky: "var(--ch-bluesky)",
 };
 
+// Brand marks render from @tabler/icons-react (bundled, no network) rather than
+// a runtime CDN — the icons must never show as broken images on the public page.
+const CHANNEL_ICONS: Record<Platform, ComponentType<{ size?: number; stroke?: number }>> = {
+  instagram: IconBrandInstagram,
+  x: IconBrandX,
+  linkedin: IconBrandLinkedin,
+  facebook: IconBrandFacebook,
+  tiktok: IconBrandTiktok,
+  youtube: IconBrandYoutube,
+  threads: IconBrandThreads,
+  bluesky: IconBrandBluesky,
+};
+
+const PLATFORM_LABELS: Record<Platform, string> = {
+  instagram: "Instagram",
+  x: "X",
+  linkedin: "LinkedIn",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  threads: "Threads",
+  bluesky: "Bluesky",
+};
+
 function ChannelBubble({ platform, size = 28 }: { platform: Platform; size?: number }) {
   const color = CHANNEL_COLORS[platform];
-  const iconSrc = `https://cdn.jsdelivr.net/npm/simple-icons@13/icons/${platform}.svg`;
+  const Icon = CHANNEL_ICONS[platform];
   return (
     <span
-      title={platform}
-      className="inline-flex items-center justify-center rounded-full shrink-0"
+      title={PLATFORM_LABELS[platform]}
+      className="inline-flex items-center justify-center rounded-full shrink-0 text-white"
       style={{ width: size, height: size, background: color, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)" }}
     >
-      <img src={iconSrc} alt={platform} width={size * 0.5} height={size * 0.5} style={{ filter: "brightness(0) invert(1)" }} />
+      <Icon size={Math.round(size * 0.56)} stroke={2} />
     </span>
   );
 }
@@ -167,11 +193,12 @@ function Hero() {
             className="font-display font-extrabold text-(--text-strong) mt-4"
             style={{ fontSize: "clamp(2.4rem, 5vw, 4.6rem)", letterSpacing: "-0.03em", lineHeight: 0.98 }}
           >
-            Schedule once.<br />Post <span className="text-(--brand)">everywhere</span>.
+            Social scheduling,<br /><span className="text-(--brand)">finally simple</span>.
           </h1>
           <p className="text-[1.0625rem] text-(--text-muted) leading-[1.55] mt-5 max-w-115">
-            Pub Flow turns the weekly scramble into one calm stream. Write a post, tailor it per
-            channel, and let your whole week publish itself — on time, every time.
+            One calm composer for every channel. Write a post, tailor it per platform, and let
+            your whole week publish itself — no clutter, no learning curve. And the price is just
+            as simple: <strong className="text-(--text-body)">25 connected accounts for $15/mo</strong>, unlimited posts.
           </p>
           <div className="flex flex-wrap gap-3 mt-7 items-center">
             <Link
@@ -180,22 +207,18 @@ function Hero() {
             >
               Start free <ArrowRight size={18} />
             </Link>
-            <a href="#features" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-              See how it works
+            <a href="#pricing" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+              See the pricing
             </a>
           </div>
-          <div className="flex items-center gap-3.5 mt-6 text-(--text-subtle) text-[0.8125rem]">
-            <div className="flex">
-              {["Mia", "Theo", "Ada", "Sol"].map((n, i) => (
-                <span key={n} className="rounded-full border-2 border-(--surface-page) inline-flex" style={{ marginLeft: i ? -8 : 0 }}>
-                  <span className="w-8 h-8 rounded-full bg-(--flow-200) text-(--flow-800) inline-flex items-center justify-center text-xs font-bold">
-                    {n[0]}
-                  </span>
-                </span>
-              ))}
-            </div>
-            <span>Loved by <strong className="text-(--text-body)">12,000+</strong> creators &amp; small teams</span>
-          </div>
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 mt-6 text-(--text-subtle) text-[0.8125rem] list-none p-0">
+            {["7-day free trial", "No credit card", "Cancel anytime"].map((item) => (
+              <li key={item} className="inline-flex items-center gap-1.5">
+                <Check size={14} className="text-(--brand-hover)" strokeWidth={2.6} />
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
         <HeroPreview />
       </div>
@@ -368,10 +391,10 @@ function AnalyticsVisual() {
 
 function FlowBand() {
   const stats = [
-    ["12,000+", "creators & teams"],
-    ["3.4M", "posts published"],
-    ["8", "channels supported"],
-    ["6 hrs", "saved per week"],
+    ["8", "channels, one composer"],
+    ["25", "accounts on the $15 plan"],
+    ["Unlimited", "posts on every tier"],
+    ["7 days", "free, no card required"],
   ];
   return (
     <section className="bg-(--ink-900) text-(--paper-100) py-14 lg:py-18 relative overflow-hidden">
@@ -404,13 +427,6 @@ function FlowBand() {
 /* ------------------------------------------------------------------ */
 /*  Pricing                                                              */
 /* ------------------------------------------------------------------ */
-
-type PlanItem = {
-  id: string;
-  name: string;
-  description: string | null;
-  prices: { id: string; amount: number; currency: string; interval: string | null }[];
-};
 
 function PriceCard({
   name, price, blurb, features, featured, cta, isSignedIn,
@@ -465,34 +481,40 @@ function PriceCard({
   );
 }
 
-function Pricing({ plans, isSignedIn }: { plans: { items: PlanItem[] }; isSignedIn: boolean }) {
-  const planDefs = [
-    {
-      key: "base",
-      name: "Base",
-      blurb: "For one creator finding their rhythm.",
-      features: ["25 connected accounts", "Unlimited scheduling", "Weekly calendar", "Basic analytics"],
-      featured: false,
-      cta: "Get started",
-    },
-    {
-      key: "pro",
-      name: "Pro",
-      blurb: "For creators & small teams in full flow.",
-      features: ["50 connected accounts", "Unlimited scheduling", "Best-time slots & auto-queue", "Per-channel tailoring", "Full analytics"],
-      featured: true,
-      cta: "Start free trial",
-    },
-    {
-      key: "premium",
-      name: "Premium",
-      blurb: "For agencies running many brands.",
-      features: ["Unlimited accounts", "Everything in Pro", "Approval workflows", "Shared content library", "Priority support"],
-      featured: false,
-      cta: "Talk to us",
-    },
-  ];
+// Canonical pricing facts (the marketing source of truth). Hard-coded so the
+// concrete numbers always render on the logged-out page, independent of whether
+// the Polar live-data fetch succeeds; Polar drives the authenticated checkout.
+const PLAN_DEFS = [
+  {
+    key: "base",
+    name: "Base",
+    price: "$15",
+    blurb: "For one creator finding their rhythm.",
+    features: ["Unlimited posts", "25 connected accounts", "Weekly calendar", "Basic analytics"],
+    featured: false,
+    cta: "Get started",
+  },
+  {
+    key: "pro",
+    name: "Pro",
+    price: "$20",
+    blurb: "For creators & small teams in full flow.",
+    features: ["Unlimited posts", "50 connected accounts", "Best-time slots & auto-queue", "Per-channel tailoring", "Full analytics"],
+    featured: true,
+    cta: "Start free trial",
+  },
+  {
+    key: "premium",
+    name: "Premium",
+    price: "$60",
+    blurb: "For agencies running many brands.",
+    features: ["Unlimited posts", "Unlimited connected accounts", "Multiple team members", "Approval workflows", "Shared content library", "Priority support"],
+    featured: false,
+    cta: "Talk to us",
+  },
+] as const;
 
+function Pricing({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <section id="pricing" className={`${WRAP} pt-16 lg:pt-20 pb-10`}>
       <div className="text-center max-w-140 mx-auto mb-10 lg:mb-11">
@@ -503,26 +525,167 @@ function Pricing({ plans, isSignedIn }: { plans: { items: PlanItem[] }; isSigned
         >
           Simple plans that grow with you
         </h2>
-        <p className="text-(--text-muted) text-[1.0625rem] m-0">Start free. Upgrade when your queue does.</p>
+        <p className="text-(--text-muted) text-[1.0625rem] m-0">Unlimited posts on every tier. Start free, upgrade when your queue does.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 items-start">
-        {planDefs.map((def) => {
-          const polar = plans.items.find((p) => p.name.toLowerCase().includes(def.key));
-          const amount = polar?.prices?.[0]?.amount;
-          const price = amount != null ? `$${Math.round(amount / 100)}` : "—";
-          return (
-            <PriceCard
-              key={def.key}
-              name={def.name}
-              price={price}
-              blurb={def.blurb}
-              features={def.features}
-              featured={def.featured}
-              cta={def.cta}
-              isSignedIn={isSignedIn}
-            />
-          );
-        })}
+        {PLAN_DEFS.map((def) => (
+          <PriceCard
+            key={def.key}
+            name={def.name}
+            price={def.price}
+            blurb={def.blurb}
+            features={[...def.features]}
+            featured={def.featured}
+            cta={def.cta}
+            isSignedIn={isSignedIn}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Price comparison (accounts-per-dollar vs. named competitors)         */
+/* ------------------------------------------------------------------ */
+
+// Competitor figures are volatile — re-verify before each launch. Each is the
+// provider's lowest paid plan at monthly billing, as of the date stamped on the
+// table. "Per account / mo" = plan price ÷ accounts the plan includes. Sources
+// (checked 2026-06-18): buffer.com/pricing, hootsuite.com/plans, later.com/pricing,
+// sproutsocial.com/pricing. Annual billing is typically cheaper across the board.
+const COMPARISON_AS_OF = "June 18, 2026";
+
+type CompareRow = {
+  provider: string;
+  plan: string;
+  price: string;
+  accounts: string;
+  perAccount: string;
+  us?: boolean;
+  note?: number;
+};
+
+const COMPARE_ROWS: CompareRow[] = [
+  { provider: "PubFlow", plan: "Base", price: "$15/mo", accounts: "25 accounts", perAccount: "$0.60", us: true },
+  { provider: "Buffer", plan: "Essentials", price: "$6/mo", accounts: "1 channel, billed per channel", perAccount: "$6.00" },
+  { provider: "Later", plan: "Starter", price: "$25/mo", accounts: "1 social set", perAccount: "—", note: 1 },
+  { provider: "Hootsuite", plan: "Standard", price: "$99/mo", accounts: "5 accounts", perAccount: "$19.80" },
+  { provider: "Sprout Social", plan: "Standard", price: "$199/mo", accounts: "5 profiles", perAccount: "$39.80" },
+];
+
+function PriceComparison() {
+  return (
+    <section className={`${WRAP} pt-6 pb-12 lg:pb-16`}>
+      <div className="text-center max-w-150 mx-auto mb-8 lg:mb-10">
+        <Eyebrow>The math, in the open</Eyebrow>
+        <h2
+          className="font-display font-bold text-(--text-strong) mt-3.5 mb-2"
+          style={{ fontSize: "clamp(1.6rem, 2.8vw, 2.6rem)", letterSpacing: "-0.015em" }}
+        >
+          More accounts, less money
+        </h2>
+        <p className="text-(--text-muted) text-[1.0625rem] m-0">
+          Most tools charge per seat or per channel, so the bill balloons as you grow. PubFlow includes
+          25 accounts on its entry plan. Here's how the lowest paid plans line up.
+        </p>
+      </div>
+
+      {/* Desktop / tablet: table */}
+      <div className="hidden sm:block overflow-hidden rounded-[22px] border border-(--border-subtle) shadow-(--shadow-sm-ds) bg-(--surface-card)">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="bg-(--surface-sunk) text-(--text-subtle) text-[0.6875rem] font-bold uppercase tracking-[0.08em]">
+              <th className="py-3.5 px-5">Provider</th>
+              <th className="py-3.5 px-5">Lowest paid plan</th>
+              <th className="py-3.5 px-5">Accounts included</th>
+              <th className="py-3.5 px-5 text-right">Per account / mo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARE_ROWS.map((r) => (
+              <tr
+                key={r.provider}
+                className={cn(
+                  "border-t border-(--border-subtle)",
+                  r.us && "bg-(--flow-050)"
+                )}
+              >
+                <td className="py-4 px-5">
+                  <span className={cn("font-display font-bold text-(--text-strong)", r.us && "text-(--brand-hover)")}>
+                    {r.provider}
+                  </span>
+                  {r.us && (
+                    <span className="ml-2 align-middle text-[0.625rem] font-bold px-2 py-0.5 rounded-full bg-(--brand) text-white uppercase tracking-[0.06em]">
+                      You're here
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-(--text-body) text-[0.9375rem]">
+                  <span className="font-semibold text-(--text-strong)">{r.price}</span>
+                  <span className="text-(--text-muted)"> · {r.plan}</span>
+                </td>
+                <td className="py-4 px-5 text-(--text-body) text-[0.9375rem]">
+                  {r.accounts}
+                  {r.note && <sup className="text-(--text-subtle)">{r.note}</sup>}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <span className={cn("font-display font-bold text-[1.0625rem]", r.us ? "text-(--brand-hover)" : "text-(--text-strong)")}>
+                    {r.perAccount}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile: stacked cards */}
+      <div className="sm:hidden flex flex-col gap-3">
+        {COMPARE_ROWS.map((r) => (
+          <div
+            key={r.provider}
+            className={cn(
+              "rounded-2xl border p-4 bg-(--surface-card)",
+              r.us ? "border-[1.5px] border-(--brand) bg-(--flow-050)" : "border-(--border-subtle)"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className={cn("font-display font-bold text-(--text-strong)", r.us && "text-(--brand-hover)")}>
+                {r.provider}
+              </span>
+              {r.us && (
+                <span className="text-[0.625rem] font-bold px-2 py-0.5 rounded-full bg-(--brand) text-white uppercase tracking-[0.06em]">
+                  You're here
+                </span>
+              )}
+            </div>
+            <div className="mt-2 text-[0.8125rem] text-(--text-muted)">
+              <span className="font-semibold text-(--text-body)">{r.price}</span> · {r.plan}
+            </div>
+            <div className="mt-2.5 flex items-end justify-between">
+              <span className="text-[0.8125rem] text-(--text-body)">
+                {r.accounts}
+                {r.note && <sup className="text-(--text-subtle)">{r.note}</sup>}
+              </span>
+              <span className={cn("font-display font-bold text-[1.125rem]", r.us ? "text-(--brand-hover)" : "text-(--text-strong)")}>
+                {r.perAccount}
+                <span className="block text-[0.625rem] font-normal text-(--text-subtle) text-right">/ account / mo</span>
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 text-[0.75rem] text-(--text-subtle) leading-relaxed max-w-180">
+        <p className="m-0">
+          Prices as of <strong className="text-(--text-muted)">{COMPARISON_AS_OF}</strong>, each provider's lowest paid plan
+          at monthly billing; annual billing is typically cheaper across the board. Competitor pricing changes often — figures are
+          for comparison and should be re-checked against each provider's site.
+        </p>
+        <p className="m-0 mt-1.5">
+          <sup>1</sup> Later's Starter bundles one “social set” — up to one profile per platform — so its cost per account depends on how many networks you connect.
+        </p>
       </div>
     </section>
   );
@@ -576,7 +739,7 @@ function FinalCTA() {
 /* ------------------------------------------------------------------ */
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { isSignedIn, plans } = loaderData;
+  const { isSignedIn } = loaderData;
   return (
     <div id="features" className="bg-(--surface-page)">
       <SiteNav isSignedIn={isSignedIn} />
@@ -617,7 +780,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         visual={<AnalyticsVisual />}
       />
       <FlowBand />
-      <Pricing plans={plans} isSignedIn={isSignedIn} />
+      <Pricing isSignedIn={isSignedIn} />
+      <PriceComparison />
       <FinalCTA />
       <SiteFooter />
     </div>
