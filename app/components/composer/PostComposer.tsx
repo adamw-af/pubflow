@@ -13,7 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { VariantEditor } from "./VariantEditor";
-import { PLATFORM_LIMITS } from "./CharacterCounter";
+import { getPlatformMetadata } from "../../../convex/platforms/metadata";
+import { validateAgainstCapability } from "../../../convex/platforms/capabilityValidation";
 import { CalendarIcon, Linkedin, Instagram, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ export function PostComposer() {
   const editPostId = searchParams.get("edit") as Id<"posts"> | null;
 
   const accounts = (useQuery(api.socialAccounts.listForCurrentWorkspace) ?? []) as Doc<"socialAccounts">[];
+  const mediaItems = (useQuery(api.media.listForCurrentWorkspace) ?? []) as (Doc<"mediaItems"> & { url: string })[];
   const hashtagSets = (useQuery(api.socialAccounts.listHashtagSetsForCurrentWorkspace) ?? []) as Doc<"hashtagSets">[];
   const workspace = useQuery(api.workspaces.getMyWorkspace);
   const existingPost = useQuery(
@@ -97,6 +99,29 @@ export function PostComposer() {
     (a) => selectedIds.has(a._id) && a.status === "active"
   );
 
+  // Whether each media item is a video — the one fact the Capability rules need
+  // beyond what the composer already holds.
+  const isVideoById = new Map(
+    mediaItems.map((m) => [m._id as string, m.mimeType.startsWith("video/")])
+  );
+
+  // Per-Platform Capability errors, computed through the same canonical
+  // validator the backend uses at schedule time, so the inline warning and the
+  // server's decision can never disagree.
+  function errorsForAccount(account: Doc<"socialAccounts">) {
+    const content = variants[account._id];
+    const media = (content?.mediaItemIds ?? []).map((id) => ({
+      isVideo: isVideoById.get(id as string) ?? false,
+    }));
+    return validateAgainstCapability(
+      getPlatformMetadata(account.platform).capability,
+      { caption: content?.caption ?? "", media }
+    );
+  }
+
+  const variantErrors: Record<string, ReturnType<typeof errorsForAccount>> =
+    Object.fromEntries(activeAccounts.map((a) => [a._id, errorsForAccount(a)]));
+
   function toggleAccount(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -150,18 +175,20 @@ export function PostComposer() {
     return d.getTime();
   }
 
-  function hasOverLimitVariant(): boolean {
-    return activeAccounts.some((acc) => {
-      const caption = variants[acc._id]?.caption ?? "";
-      const limit = PLATFORM_LIMITS[acc.platform] ?? Infinity;
-      return caption.length > limit;
-    });
+  function blockedPlatforms(): string[] {
+    return activeAccounts
+      .filter((acc) => variantErrors[acc._id]?.length > 0)
+      .map((acc) => getPlatformMetadata(acc.platform).displayName);
   }
 
   async function handleSubmit(asDraft: boolean) {
     if (selectedIds.size === 0) { toast.error("Select at least one social account"); return; }
     if (!asDraft && !scheduleDate) { toast.error("Pick a date to schedule, or save as draft"); return; }
-    if (hasOverLimitVariant()) { toast.error("One or more captions exceed the platform character limit"); return; }
+    const blocked = blockedPlatforms();
+    if (!asDraft && blocked.length > 0) {
+      toast.error(`Fix ${blocked.join(", ")} before scheduling, or drop ${blocked.length > 1 ? "them" : "it"}`);
+      return;
+    }
 
     const scheduledAt = asDraft ? undefined : buildScheduledAt();
     const variantArgs = activeAccounts.map((acc) => ({
@@ -257,6 +284,7 @@ export function PostComposer() {
                 caption={variants[activeAccounts[0]._id]?.caption ?? ""}
                 mediaItemIds={variants[activeAccounts[0]._id]?.mediaItemIds ?? []}
                 hashtagSets={hashtagSets}
+                errors={variantErrors[activeAccounts[0]._id] ?? []}
                 onChange={(c) => updateCaption(activeAccounts[0]._id, c)}
                 onMediaChange={(ids) => updateMedia(activeAccounts[0]._id, ids)}
               />
@@ -268,7 +296,7 @@ export function PostComposer() {
                   <TabsTrigger key={acc._id} value={acc._id} className="flex items-center gap-1.5">
                     {PLATFORM_ICONS[acc.platform]}
                     @{acc.platformUsername}
-                    {(variants[acc._id]?.caption?.length ?? 0) > (PLATFORM_LIMITS[acc.platform] ?? Infinity) && (
+                    {(variantErrors[acc._id]?.length ?? 0) > 0 && (
                       <Badge variant="destructive" className="ml-1 h-4 text-[10px]">!</Badge>
                     )}
                   </TabsTrigger>
@@ -282,6 +310,7 @@ export function PostComposer() {
                     caption={variants[acc._id]?.caption ?? ""}
                     mediaItemIds={variants[acc._id]?.mediaItemIds ?? []}
                     hashtagSets={hashtagSets}
+                    errors={variantErrors[acc._id] ?? []}
                     onChange={(c) => updateCaption(acc._id, c)}
                     onMediaChange={(ids) => updateMedia(acc._id, ids)}
                   />
@@ -330,7 +359,12 @@ export function PostComposer() {
       <div className="flex gap-3">
         <Button
           onClick={() => handleSubmit(false)}
-          disabled={isSubmitting || selectedIds.size === 0 || !scheduleDate}
+          disabled={
+            isSubmitting ||
+            selectedIds.size === 0 ||
+            !scheduleDate ||
+            blockedPlatforms().length > 0
+          }
         >
           {isSubmitting ? <Loader2 className="size-4 mr-2 animate-spin" /> : null}
           {editPostId ? "Update post" : "Schedule post"}

@@ -31,5 +31,3 @@ export function CharacterCounter({ platform, count }: CharacterCounterProps) {
     </span>
   );
 }
-
-export { PLATFORM_LIMITS };
