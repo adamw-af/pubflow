@@ -33,6 +33,37 @@ export type PlatformCapability = {
   privacyDisclosureApplies: boolean;
 };
 
+/**
+ * TikTok's required privacy + commercial-disclosure settings for one video
+ * Post (Content Posting API). Carried on the Post Variant and passed through to
+ * the adapter at publish time.
+ */
+export type TikTokPrivacyLevel =
+  | "PUBLIC_TO_EVERYONE"
+  | "MUTUAL_FOLLOW_FRIENDS"
+  | "FOLLOWER_OF_CREATOR"
+  | "SELF_ONLY";
+
+export type TikTokVariantOptions = {
+  privacyLevel: TikTokPrivacyLevel;
+  /** Whether the video discloses commercial content (TikTok's required toggle). */
+  disclosureEnabled: boolean;
+  /** "Branded content" — promotes a third party. Requires disclosure. */
+  brandedContent?: boolean;
+  /** "Your brand" — promotes the creator's own business. Requires disclosure. */
+  yourBrand?: boolean;
+};
+
+/**
+ * Platform-specific structured options resolved from a Post Variant. Optional
+ * and keyed per Platform so the shared publish contract stays uniform while
+ * video Platforms (TikTok now, YouTube Shorts in #10) carry the extra fields
+ * they require.
+ */
+export type VariantOptions = {
+  tiktok?: TikTokVariantOptions;
+};
+
 /** Everything an adapter needs to publish a single Post Variant. */
 export type PublishPayload = {
   accessToken: string;
@@ -41,12 +72,40 @@ export type PublishPayload = {
   mediaUrls: string[];
   /** The Platform's account id (Instagram business id, LinkedIn member, etc.). */
   platformAccountId: string;
+  /** Platform-specific options resolved from the Post Variant (TikTok privacy). */
+  options?: VariantOptions;
 };
 
-/** Result of a publish attempt. ADR 0007 will add an in-progress shape. */
+/**
+ * Result of a publish attempt (ADR 0007). Sync Platforms finish in one call and
+ * return *done* with the platform post id. Async Platforms (TikTok, YouTube
+ * Shorts) only *initiate* publishing and return *in-progress* with an opaque
+ * job handle; the Publication stays in a durable `publishing` state and a cron
+ * sweep polls `checkStatus(handle)` until it settles.
+ */
 export type PublishResult =
   | { success: true; platformPostId: string }
+  | { success: true; inProgress: true; jobHandle: string }
   | { success: false; error: string };
+
+/**
+ * Outcome of polling an in-progress publish job (ADR 0007). `in_progress` means
+ * the Platform is still processing (the sweep tries again later); the other two
+ * are terminal and transition the Publication to `published`/`failed`.
+ */
+export type PublishStatusResult =
+  | { status: "published"; platformPostId: string }
+  | { status: "in_progress" }
+  | { status: "failed"; error: string };
+
+/** What the poll sweep hands an adapter to check an in-progress job. */
+export type CheckStatusArgs = {
+  accessToken: string;
+  /** The opaque job handle returned by `publish()` (e.g. TikTok publish_id). */
+  jobHandle: string;
+  /** The Platform's account id, for Platforms whose status call needs it. */
+  platformAccountId: string;
+};
 
 /** Tokens + identity resolved from an OAuth code exchange. */
 export type TokenResult = {
@@ -150,4 +209,11 @@ export type PlatformAdapter = {
   capability: PlatformCapability;
   auth: AuthAdapter;
   publish: (payload: PublishPayload) => Promise<PublishResult>;
+  /**
+   * Poll an in-progress publish job for completion (ADR 0007). Only async
+   * Platforms (those whose `publish()` can return the in-progress shape)
+   * implement this; the cron poll sweep calls it for `publishing` Publications
+   * that carry a stored job handle.
+   */
+  checkStatus?: (args: CheckStatusArgs) => Promise<PublishStatusResult>;
 };

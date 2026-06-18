@@ -5,6 +5,7 @@ import { internal } from "./_generated/api";
 import { decryptToken, encryptToken } from "./lib/encryption";
 import { getNextOccurrence } from "./lib/recurrence";
 import { getAdapter } from "./platforms/registry";
+import type { PublishResult, PublishStatusResult } from "./platforms/types";
 
 const MAX_BATCH = 50;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL ?? "";
@@ -12,6 +13,66 @@ const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL ?? "";
 // short-lived tokens (e.g. Bluesky's ~2h access JWT) that the daily refresh
 // cron cannot keep alive for Posts scheduled further out.
 const PUBLISH_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+
+// ---------------------------------------------------------------------------
+// Publish outcomes (ADR 0007)
+//
+// A publish attempt settles into one of three states. `published`/`failed` are
+// terminal; `in_progress` is the durable async case — the Publication stays
+// `publishing` with the platform job handle stored and the cron poll sweep
+// settles it later. `toOutcome` maps the three-shape PublishResult, and
+// `toStatusOutcome` maps the poll result; `recordOutcome` persists either and
+// notifies on failure, so the publish and poll paths share one code path.
+// ---------------------------------------------------------------------------
+
+type PublishOutcome =
+  | { state: "published"; platformPostId: string }
+  | { state: "in_progress"; jobHandle: string }
+  | { state: "failed"; error: string };
+
+function toOutcome(result: PublishResult): PublishOutcome {
+  if (!result.success) return { state: "failed", error: result.error };
+  if ("inProgress" in result) return { state: "in_progress", jobHandle: result.jobHandle };
+  return { state: "published", platformPostId: result.platformPostId };
+}
+
+function toStatusOutcome(result: PublishStatusResult): PublishOutcome {
+  if (result.status === "published")
+    return { state: "published", platformPostId: result.platformPostId };
+  if (result.status === "failed") return { state: "failed", error: result.error };
+  return { state: "in_progress", jobHandle: "" };
+}
+
+async function recordOutcome(
+  ctx: any,
+  publicationId: Id<"publications">,
+  postId: Id<"posts">,
+  outcome: PublishOutcome
+): Promise<void> {
+  await ctx.runMutation(internal.publisher.recordPublicationResult, {
+    publicationId,
+    status: outcome.state === "in_progress" ? "publishing" : outcome.state,
+    platformJobHandle: outcome.state === "in_progress" ? outcome.jobHandle : undefined,
+    publishedAt: outcome.state === "published" ? Date.now() : undefined,
+    errorMessage: outcome.state === "failed" ? outcome.error : undefined,
+  });
+
+  if (outcome.state !== "failed") return;
+
+  const notifyData = await ctx.runQuery(internal.publisher.getNotificationData, {
+    publicationId,
+  });
+  if (notifyData?.emailEnabled) {
+    await ctx.runAction(internal.notifications.sendPublicationFailureEmail, {
+      toEmail: notifyData.ownerEmail,
+      workspaceName: notifyData.workspaceName,
+      platform: notifyData.platform,
+      platformUsername: notifyData.platformUsername,
+      errorMessage: outcome.error,
+      postId,
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Main action — called by the cron every minute
@@ -25,7 +86,7 @@ export const processScheduledPublications = internalAction({
     const due = await ctx.runMutation(internal.publisher.claimDuePublications, { now });
 
     for (const pub of due) {
-      let result: { success: boolean; platformPostId?: string; error?: string };
+      let outcome: PublishOutcome;
 
       try {
         // Fetch variant + social account + media
@@ -48,42 +109,18 @@ export const processScheduledPublications = internalAction({
           caption: variant.caption ?? "",
           mediaUrls,
           platformAccountId: socialAccount.platformAccountId,
+          options: variant.tiktokOptions ? { tiktok: variant.tiktokOptions } : undefined,
         });
 
-        result = publishResult.success
-          ? { success: true, platformPostId: publishResult.platformPostId }
-          : { success: false, error: publishResult.error };
+        outcome = toOutcome(publishResult);
       } catch (err) {
-        result = {
-          success: false,
+        outcome = {
+          state: "failed",
           error: err instanceof Error ? err.message : String(err),
         };
       }
 
-      await ctx.runMutation(internal.publisher.recordPublicationResult, {
-        publicationId: pub._id,
-        postId: pub.postId,
-        success: result.success,
-        errorMessage: result.error,
-        publishedAt: result.success ? Date.now() : undefined,
-      });
-
-      // Send failure notification email if enabled
-      if (!result.success) {
-        const notifyData = await ctx.runQuery(internal.publisher.getNotificationData, {
-          publicationId: pub._id,
-        });
-        if (notifyData?.emailEnabled) {
-          await ctx.runAction(internal.notifications.sendPublicationFailureEmail, {
-            toEmail: notifyData.ownerEmail,
-            workspaceName: notifyData.workspaceName,
-            platform: notifyData.platform,
-            platformUsername: notifyData.platformUsername,
-            errorMessage: result.error ?? "Unknown error",
-            postId: pub.postId,
-          });
-        }
-      }
+      await recordOutcome(ctx, pub._id, pub.postId, outcome);
     }
 
     // Roll up post statuses and schedule next occurrences for templates
@@ -91,6 +128,90 @@ export const processScheduledPublications = internalAction({
     for (const postId of postIds) {
       await ctx.runMutation(internal.publisher.rollupPostStatus, { postId });
     }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Poll sweep — called by the cron every minute (ADR 0007)
+//
+// Reads Publications that are durably `publishing` with a stored platform job
+// handle (the async video case), asks each adapter's checkStatus whether the
+// job has settled, and transitions to published/failed. Still-processing jobs
+// are left untouched for the next sweep. Posts touched here are rolled up after
+// (a Post stays unsettled while any of its Publications is still publishing).
+// ---------------------------------------------------------------------------
+
+export const pollPublishingPublications = internalAction({
+  handler: async (ctx) => {
+    const pending = await ctx.runQuery(internal.publisher.getPublishingPublications, {});
+
+    const touchedPosts = new Set<Id<"posts">>();
+
+    for (const pub of pending) {
+      const adapter = getAdapter(pub.socialAccount.platform);
+      // Only async platforms store a handle; without checkStatus there is
+      // nothing to poll, so leave it for an operator to investigate.
+      if (!adapter.checkStatus) continue;
+
+      let outcome: PublishOutcome;
+      try {
+        const accessToken = await ensureFreshAccessToken(ctx, pub.socialAccount);
+        const status = await adapter.checkStatus({
+          accessToken,
+          jobHandle: pub.platformJobHandle,
+          platformAccountId: pub.socialAccount.platformAccountId,
+        });
+        outcome = toStatusOutcome(status);
+      } catch (err) {
+        outcome = {
+          state: "failed",
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+
+      // Still processing — no state change, try again next sweep.
+      if (outcome.state === "in_progress") continue;
+
+      await recordOutcome(ctx, pub.publicationId, pub.postId, outcome);
+      touchedPosts.add(pub.postId);
+    }
+
+    for (const postId of touchedPosts) {
+      await ctx.runMutation(internal.publisher.rollupPostStatus, { postId });
+    }
+  },
+});
+
+export const getPublishingPublications = internalQuery({
+  handler: async (ctx) => {
+    const publishing = await ctx.db
+      .query("publications")
+      .withIndex("by_status_scheduled", (q) => q.eq("status", "publishing"))
+      .take(MAX_BATCH);
+
+    // Only the async case carries a stored handle; a sync Publication caught
+    // transiently `publishing` mid-sweep has none and must not be polled.
+    const withHandle = publishing.filter((p) => p.platformJobHandle);
+
+    const rows = [];
+    for (const pub of withHandle) {
+      const socialAccount = await ctx.db.get(pub.socialAccountId);
+      if (!socialAccount) continue;
+      rows.push({
+        publicationId: pub._id,
+        postId: pub.postId,
+        platformJobHandle: pub.platformJobHandle!,
+        socialAccount: {
+          _id: socialAccount._id,
+          platform: socialAccount.platform,
+          platformAccountId: socialAccount.platformAccountId,
+          encryptedAccessToken: socialAccount.encryptedAccessToken,
+          encryptedRefreshToken: socialAccount.encryptedRefreshToken,
+          tokenExpiresAt: socialAccount.tokenExpiresAt,
+        },
+      });
+    }
+    return rows;
   },
 });
 
@@ -161,16 +282,23 @@ export const claimDuePublications = internalMutation({
 export const recordPublicationResult = internalMutation({
   args: {
     publicationId: v.id("publications"),
-    postId: v.id("posts"),
-    success: v.boolean(),
+    // `publishing` is the durable async case (ADR 0007): the handle is stored
+    // and the poll sweep settles it later to `published`/`failed`.
+    status: v.union(
+      v.literal("publishing"),
+      v.literal("published"),
+      v.literal("failed")
+    ),
     errorMessage: v.optional(v.string()),
     publishedAt: v.optional(v.number()),
+    platformJobHandle: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.publicationId, {
-      status: args.success ? "published" : "failed",
+      status: args.status,
       publishedAt: args.publishedAt,
       errorMessage: args.errorMessage,
+      platformJobHandle: args.platformJobHandle,
     });
   },
 });
@@ -183,11 +311,16 @@ export const rollupPostStatus = internalMutation({
       .withIndex("by_post", (q) => q.eq("postId", postId))
       .collect();
 
-    // Only roll up once all publications have settled (none still publishing/scheduled)
-    const unsettled = publications.filter(
-      (p) => p.status === "scheduled" || p.status === "publishing"
-    );
-    if (unsettled.length > 0) return;
+    // A Post that still has a Publication waiting to start (scheduled) is left
+    // as-is. Once all have started, if any is still being processed by its
+    // Platform (durable `publishing`, ADR 0007) the Post reflects that
+    // in-progress state; only when every Publication has settled does the Post
+    // roll up to published/failed/partial.
+    if (publications.some((p) => p.status === "scheduled")) return;
+    if (publications.some((p) => p.status === "publishing")) {
+      await ctx.db.patch(postId, { status: "publishing" });
+      return;
+    }
 
     const allPublished = publications.every((p) => p.status === "published");
     const allFailed = publications.every((p) => p.status === "failed");
@@ -316,6 +449,7 @@ async function scheduleNextFromTemplate(
       socialAccountId: tv.socialAccountId,
       caption: tv.caption,
       mediaItemIds: tv.mediaItemIds,
+      tiktokOptions: tv.tiktokOptions,
     });
 
     await ctx.db.insert("publications", {

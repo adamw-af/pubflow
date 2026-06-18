@@ -15,7 +15,8 @@ import { Separator } from "~/components/ui/separator";
 import { VariantEditor } from "./VariantEditor";
 import { getPlatformMetadata } from "../../../convex/platforms/metadata";
 import { validateAgainstCapability } from "../../../convex/platforms/capabilityValidation";
-import { CalendarIcon, Linkedin, Instagram, Loader2 } from "lucide-react";
+import type { TikTokVariantOptions } from "../../../convex/platforms/types";
+import { CalendarIcon, Linkedin, Instagram, Loader2, Music2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -23,17 +24,20 @@ const PLATFORM_ICONS: Record<string, React.ReactNode> = {
   linkedin: <Linkedin className="size-3.5" />,
   instagram: <Instagram className="size-3.5" />,
   x: <span className="font-bold text-xs leading-none">𝕏</span>,
+  tiktok: <Music2 className="size-3.5" />,
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
   linkedin: "bg-blue-600",
   instagram: "bg-gradient-to-br from-purple-500 to-pink-500",
   x: "bg-black",
+  tiktok: "bg-black",
 };
 
 type VariantContent = {
   caption: string;
   mediaItemIds: Id<"mediaItems">[];
+  tiktokOptions?: TikTokVariantOptions;
 };
 
 export function PostComposer() {
@@ -80,6 +84,7 @@ export function PostComposer() {
       variantMap[v.socialAccountId as string] = {
         caption: v.caption ?? "",
         mediaItemIds: (v.mediaItemIds ?? []) as Id<"mediaItems">[],
+        tiktokOptions: v.tiktokOptions ?? undefined,
       };
     }
     setVariants(variantMap);
@@ -167,6 +172,16 @@ export function PostComposer() {
     }));
   }
 
+  function updateTikTokOptions(accountId: string, tiktokOptions: TikTokVariantOptions) {
+    setVariants((prev) => ({
+      ...prev,
+      [accountId]: {
+        ...(prev[accountId] ?? { caption: "", mediaItemIds: [] }),
+        tiktokOptions,
+      },
+    }));
+  }
+
   function buildScheduledAt(): number | undefined {
     if (!scheduleDate) return undefined;
     const [hh, mm] = scheduleTime.split(":").map(Number);
@@ -195,6 +210,7 @@ export function PostComposer() {
       socialAccountId: acc._id,
       caption: variants[acc._id]?.caption || undefined,
       mediaItemIds: variants[acc._id]?.mediaItemIds ?? [],
+      tiktokOptions: variants[acc._id]?.tiktokOptions,
     }));
 
     setIsSubmitting(true);
@@ -285,8 +301,10 @@ export function PostComposer() {
                 mediaItemIds={variants[activeAccounts[0]._id]?.mediaItemIds ?? []}
                 hashtagSets={hashtagSets}
                 errors={variantErrors[activeAccounts[0]._id] ?? []}
+                tiktokOptions={variants[activeAccounts[0]._id]?.tiktokOptions}
                 onChange={(c) => updateCaption(activeAccounts[0]._id, c)}
                 onMediaChange={(ids) => updateMedia(activeAccounts[0]._id, ids)}
+                onTikTokOptionsChange={(o) => updateTikTokOptions(activeAccounts[0]._id, o)}
               />
             </div>
           ) : (
@@ -311,8 +329,10 @@ export function PostComposer() {
                     mediaItemIds={variants[acc._id]?.mediaItemIds ?? []}
                     hashtagSets={hashtagSets}
                     errors={variantErrors[acc._id] ?? []}
+                    tiktokOptions={variants[acc._id]?.tiktokOptions}
                     onChange={(c) => updateCaption(acc._id, c)}
                     onMediaChange={(ids) => updateMedia(acc._id, ids)}
+                    onTikTokOptionsChange={(o) => updateTikTokOptions(acc._id, o)}
                   />
                 </TabsContent>
               ))}

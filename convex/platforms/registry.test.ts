@@ -7,13 +7,14 @@ import {
 } from "./registry";
 
 describe("platform registry", () => {
-  it("registers the v1 platforms plus Bluesky, Facebook and Threads", () => {
+  it("registers the v1 platforms plus Bluesky, Facebook, Threads and TikTok", () => {
     expect([...PLATFORM_IDS].sort()).toEqual([
       "bluesky",
       "facebook",
       "instagram",
       "linkedin",
       "threads",
+      "tiktok",
       "x",
     ]);
   });
@@ -24,10 +25,19 @@ describe("platform registry", () => {
     expect(getAdapter("bluesky").displayName).toBe("Bluesky");
     expect(getAdapter("facebook").displayName).toBe("Facebook");
     expect(getAdapter("threads").displayName).toBe("Threads");
+    expect(getAdapter("tiktok").displayName).toBe("TikTok");
+  });
+
+  it("exposes checkStatus only on the async (video) platforms", () => {
+    // TikTok publishes asynchronously (ADR 0007), so it implements the poll
+    // hook; the sync Meta/AT-Protocol platforms finish in one call and don't.
+    expect(typeof getAdapter("tiktok").checkStatus).toBe("function");
+    expect(getAdapter("threads").checkStatus).toBeUndefined();
+    expect(getAdapter("bluesky").checkStatus).toBeUndefined();
   });
 
   it("throws for an unknown platform id", () => {
-    expect(() => getAdapter("tiktok")).toThrow();
+    expect(() => getAdapter("pinterest")).toThrow();
   });
 
   it("derives frontend metadata (id, displayName, icon, capability) from the adapters", () => {

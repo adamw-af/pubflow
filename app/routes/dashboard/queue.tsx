@@ -10,10 +10,16 @@ import { PenSquare } from "lucide-react";
 const STATUS_COLORS: Record<string, string> = {
   draft: "secondary",
   scheduled: "default",
+  publishing: "secondary",
   published: "default",
   failed: "destructive",
   partial: "secondary",
 } as const;
+
+// Friendlier label for the async video in-progress state (ADR 0007).
+const STATUS_LABELS: Record<string, string> = {
+  publishing: "in progress",
+};
 
 export default function QueuePage() {
   const posts = useQuery(api.posts.listPostsForCurrentWorkspace, {}) ?? [];
@@ -49,7 +55,7 @@ export default function QueuePage() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <Badge variant={STATUS_COLORS[post.status] as any}>
-                  {post.status}
+                  {STATUS_LABELS[post.status] ?? post.status}
                 </Badge>
                 {post.scheduledAt && (
                   <span className="text-sm text-muted-foreground">
