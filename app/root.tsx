@@ -74,7 +74,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* TikTok developer URL-property ownership verification (audit #14) */}
         <meta
           name="tiktok-developers-site-verification"
-          content="IwkZXKTqDMHGfA9bWluKRchLa7BU4XCr"
+          content="I5NUFglAff7Z1h3h0HrRRkk2LEk8ak6o"
         />
         <Meta />
         <Links />
