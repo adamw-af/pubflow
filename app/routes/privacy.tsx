@@ -24,7 +24,7 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
     <LegalLayout
       isSignedIn={loaderData.isSignedIn}
       title="Privacy policy"
-      updated="18 June 2026"
+      updated="26 June 2026"
       intro="Pub Flow is a social media scheduling tool. To publish on your behalf we handle a small amount of personal data and the access tokens for the accounts you connect. This page explains what we collect, why, who we share it with, and how to get it deleted."
     >
       <LegalSection heading="Who we are">
@@ -53,8 +53,9 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
             </>,
             <>
               <strong>Connected account tokens.</strong> When you connect a social account
-              (LinkedIn, Instagram, X, Bluesky, or a Facebook Page via the Meta Graph API), we store
-              the OAuth access and refresh tokens needed to publish on your behalf.
+              (LinkedIn, Instagram, X, Bluesky, a Facebook Page via the Meta Graph API, TikTok, or
+              YouTube via the Google / YouTube Data API), we store the OAuth access and refresh
+              tokens needed to publish on your behalf.
             </>,
             <>
               <strong>Media you upload.</strong> Images and video you add to posts, stored in
@@ -96,8 +97,9 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
             <><strong>Polar</strong> — subscription billing and payments.</>,
             <>
               <strong>The social platforms you connect</strong> — we send the content you schedule to
-              LinkedIn, Instagram, X, Bluesky, and Meta (Facebook Pages) so it can be published. Their
-              own privacy policies govern what they do with it.
+              LinkedIn, Instagram, X, Bluesky, Meta (Facebook Pages), TikTok, and YouTube (via the
+              Google / YouTube Data API) so it can be published. Their own privacy policies govern
+              what they do with it.
             </>,
             <>
               <strong>OpenAI</strong> — only if you use AI caption suggestions, the prompt you provide
@@ -105,6 +107,54 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
             </>,
           ]}
         />
+      </LegalSection>
+
+      <LegalSection heading="Google API Services and YouTube data">
+        <p>
+          When you connect a YouTube channel, Pub Flow accesses your Google account through the
+          Google / YouTube Data API solely to upload the videos you schedule to your channel on your
+          behalf. Pub Flow&rsquo;s use and transfer of information received from Google APIs adheres
+          to the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            className="text-(--brand-hover) font-semibold no-underline hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including its Limited Use requirements. We do not use Google or YouTube data for
+          advertising, we do not sell it, we do not transfer it to others except as needed to provide
+          the service you requested or as required by law, and we do not use it to train generalized
+          AI or machine-learning models. Our use of the YouTube Data API also complies with the{" "}
+          <a
+            href="https://developers.google.com/youtube/terms/api-services-terms-of-service"
+            className="text-(--brand-hover) font-semibold no-underline hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            YouTube API Services Terms of Service
+          </a>
+          , and by connecting YouTube you also agree to the{" "}
+          <a
+            href="https://www.youtube.com/t/terms"
+            className="text-(--brand-hover) font-semibold no-underline hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            YouTube Terms of Service
+          </a>
+          . You can revoke Pub Flow&rsquo;s access to your Google account at any time from your{" "}
+          <a
+            href="https://myaccount.google.com/permissions"
+            className="text-(--brand-hover) font-semibold no-underline hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google account permissions page
+          </a>
+          , or by disconnecting the account in Pub Flow.
+        </p>
       </LegalSection>
 
       <LegalSection heading="Retention and deletion">
