@@ -127,7 +127,8 @@ export function OnboardingWizard() {
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6">
+    <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
+      <div className="min-h-full flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md flex flex-col gap-8">
         {/* Logo / brand */}
         <div className="text-center">
@@ -363,6 +364,7 @@ export function OnboardingWizard() {
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
