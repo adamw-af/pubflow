@@ -123,17 +123,23 @@ async function publishFeed(
 // alongside publish.
 // ---------------------------------------------------------------------------
 
-const SCOPES = "pages_show_list,pages_manage_posts,pages_read_engagement";
-
+// Facebook Login for Business doesn't take a `scope` param; the requested
+// permissions (pages_show_list, pages_manage_posts, pages_read_engagement) live
+// in a reusable login *configuration* created in the App Dashboard, referenced
+// here by its id (FACEBOOK_LOGIN_CONFIG_ID). The configuration must issue a
+// *user* access token so the /me/accounts call below returns the admin's Pages.
 function authUrl({ state, callbackUrl }: AuthUrlArgs): string {
   return (
     `https://www.facebook.com/v21.0/dialog/oauth?` +
     new URLSearchParams({
       client_id: process.env.FACEBOOK_APP_ID!,
+      config_id: process.env.FACEBOOK_LOGIN_CONFIG_ID!,
       redirect_uri: callbackUrl,
       state,
       response_type: "code",
-      scope: SCOPES,
+      // Required with FB Login for Business when we ask for a `code` response
+      // alongside `config_id`; without it the dialog errors out.
+      override_default_response_type: "true",
     })
   );
 }

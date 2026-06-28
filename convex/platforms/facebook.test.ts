@@ -111,8 +111,9 @@ describe("facebookAdapter.publish", () => {
 });
 
 describe("facebookAdapter.auth.authUrl", () => {
-  it("builds the Facebook Login dialog requesting Page list + publish scopes", () => {
+  it("builds the Facebook Login for Business dialog referencing the login config", () => {
     if (facebookAdapter.auth.kind !== "oauth") throw new Error("expected oauth adapter");
+    process.env.FACEBOOK_LOGIN_CONFIG_ID = "cfg-123";
     const url = facebookAdapter.auth.authUrl({
       state: "st4te",
       callbackUrl: "https://app.example/oauth/callback/facebook",
@@ -125,9 +126,11 @@ describe("facebookAdapter.auth.authUrl", () => {
     expect(parsed.searchParams.get("redirect_uri")).toBe(
       "https://app.example/oauth/callback/facebook"
     );
-    const scope = parsed.searchParams.get("scope") ?? "";
-    expect(scope).toContain("pages_show_list");
-    expect(scope).toContain("pages_manage_posts");
+    // Business login carries permissions in the config, not a scope param.
+    expect(parsed.searchParams.get("config_id")).toBe("cfg-123");
+    expect(parsed.searchParams.get("scope")).toBeNull();
+    // Required alongside config_id when requesting a code response.
+    expect(parsed.searchParams.get("override_default_response_type")).toBe("true");
   });
 });
 

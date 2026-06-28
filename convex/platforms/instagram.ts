@@ -171,6 +171,12 @@ async function waitForContainerReady(
 
 // ---------------------------------------------------------------------------
 // OAuth
+//
+// Instagram Login uses the *Instagram* app id/secret (INSTAGRAM_APP_ID /
+// INSTAGRAM_APP_SECRET), which Meta exposes under the Instagram product and
+// which is distinct from the top-level Meta app id (FACEBOOK_APP_ID, used by
+// the Facebook Pages adapter's facebook.com/dialog/oauth). They are different
+// values even within the same Meta app — don't conflate them.
 // ---------------------------------------------------------------------------
 
 function authUrl({ state, callbackUrl }: AuthUrlArgs): string {
@@ -178,7 +184,7 @@ function authUrl({ state, callbackUrl }: AuthUrlArgs): string {
     `https://www.instagram.com/oauth/authorize?` +
     new URLSearchParams({
       response_type: "code",
-      client_id: process.env.FACEBOOK_APP_ID!,
+      client_id: process.env.INSTAGRAM_APP_ID!,
       redirect_uri: callbackUrl,
       state,
       scope: "instagram_business_basic,instagram_business_content_publish",
@@ -192,8 +198,8 @@ async function exchangeCode({ code, callbackUrl }: ExchangeArgs): Promise<TokenR
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.FACEBOOK_APP_ID!,
-      client_secret: process.env.FACEBOOK_APP_SECRET!,
+      client_id: process.env.INSTAGRAM_APP_ID!,
+      client_secret: process.env.INSTAGRAM_APP_SECRET!,
       grant_type: "authorization_code",
       redirect_uri: callbackUrl,
       code,
@@ -208,7 +214,7 @@ async function exchangeCode({ code, callbackUrl }: ExchangeArgs): Promise<TokenR
     `https://graph.instagram.com/access_token?` +
       new URLSearchParams({
         grant_type: "ig_exchange_token",
-        client_secret: process.env.FACEBOOK_APP_SECRET!,
+        client_secret: process.env.INSTAGRAM_APP_SECRET!,
         access_token: shortToken,
       })
   );
